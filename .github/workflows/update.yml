@@ -104,7 +104,7 @@ jobs:
           if git diff --cached --quiet; then echo "no change"; exit 0; fi
           git commit -m "data: update $(TZ=Asia/Hong_Kong date '+%Y-%m-%d %H:%M') HKT"
           pushed=0
-          for i in 1 2 3; do git pull --rebase -q && git push && { pushed=1; break; }; sleep 5; done
+          for i in 1 2 3; do git pull --rebase -X theirs -q && git push && { pushed=1; break; }; sleep 5; done
           [ "$pushed" = 1 ] || { echo "::error::push failed 3 times"; exit 1; }
 
       - name: Failure notice (open or update an issue; GitHub emails the owner)
