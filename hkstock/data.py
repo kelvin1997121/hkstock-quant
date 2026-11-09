@@ -15,6 +15,7 @@ from zoneinfo import ZoneInfo
 
 import pandas as pd
 
+from . import market_days
 from .universe import Market
 
 HKT = timezone(timedelta(hours=8))
@@ -98,7 +99,7 @@ def local_now(m: Market) -> datetime:
 
 def market_session(m: Market, ts: datetime | None = None) -> str:
     ts = (ts or now_hkt()).astimezone(ZoneInfo(m.tz))
-    if ts.weekday() >= 5:
+    if ts.weekday() >= 5 or market_days.is_holiday(m.key, ts.date()):
         return "休市"
     hm = ts.hour * 100 + ts.minute
     if hm < 930:
@@ -112,7 +113,8 @@ def market_session(m: Market, ts: datetime | None = None) -> str:
 def is_active(m: Market, ts: datetime | None = None) -> bool:
     """Weekday, between 08:00 and 18:30 exchange time: worth a scheduled run."""
     ts = (ts or now_hkt()).astimezone(ZoneInfo(m.tz))
-    return ts.weekday() < 5 and 800 <= ts.hour * 100 + ts.minute <= 1830
+    return (ts.weekday() < 5 and not market_days.is_holiday(m.key, ts.date())
+            and 800 <= ts.hour * 100 + ts.minute <= 1830)
 
 
 def env_flag(name: str) -> bool:

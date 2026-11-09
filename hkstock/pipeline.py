@@ -7,7 +7,7 @@ import math
 import numpy as np
 import pandas as pd
 
-from . import agent, backtest, data, events, flows, indicators, levels, news, quality, regime, scoring, tracking
+from . import agent, backtest, data, events, flows, indicators, levels, market_days, news, quality, regime, scoring, tracking
 from .universe import Market
 
 
@@ -240,6 +240,7 @@ def run(m: Market, use_news: bool = True, use_ai: bool = True, save: bool = True
     ix = prices.close[m.index].iloc[-250:]
     market = {
         "key": m.key, "name": m.name, "index_name": m.index_name,
+        "holidays": market_days.upcoming(m.key, data.local_now(m).date()),
         "index": [[d.strftime("%Y-%m-%d"), round(float(v), 1)] for d, v in ix.items()],
         "index_ma50": [None if pd.isna(v) else round(float(v), 1)
                        for v in prices.close[m.index].rolling(50).mean().iloc[-250:]],

@@ -353,9 +353,12 @@ function tzNow(tz){
     minute: "2-digit", hourCycle: "h23"}).formatToParts(new Date()).map(x => [x.type, x.value]));
   return {wd: p.weekday, hm: parseInt(p.hour, 10) * 100 + parseInt(p.minute, 10)};
 }
+function tzDate(tz){ return new Intl.DateTimeFormat("en-CA", {timeZone: tz}).format(new Date()); }  // YYYY-MM-DD
 function inSession(key){
-  const {wd, hm} = tzNow(key === "hk" ? "Asia/Hong_Kong" : "America/New_York");
+  const tz = key === "hk" ? "Asia/Hong_Kong" : "America/New_York";
+  const {wd, hm} = tzNow(tz);
   if (wd === "Sat" || wd === "Sun") return false;
+  if ((DATA[key]?.market?.holidays || []).includes(tzDate(tz))) return false;  // exchange holiday
   return hm >= 930 && hm <= (key === "hk" ? 1615 : 1605);
 }
 function checkStale(d){
