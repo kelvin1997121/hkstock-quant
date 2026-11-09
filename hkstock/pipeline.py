@@ -7,7 +7,7 @@ import math
 import numpy as np
 import pandas as pd
 
-from . import agent, backtest, data, flows, indicators, levels, news, regime, scoring, tracking
+from . import agent, backtest, data, events, flows, indicators, levels, news, regime, scoring, tracking
 from .universe import Market
 
 
@@ -199,9 +199,20 @@ def run(m: Market, use_news: bool = True, use_ai: bool = True, save: bool = True
                      "ma20": levels.tick_round(v("ma20"), m.key), "ma50": levels.tick_round(v("ma50"), m.key),
                      "ma200": levels.tick_round(v("ma200"), m.key), "drawdown": v("drawdown"),
                      "plan": levels.plan_for(L, t, m.key)}
+
+    cal = events.calendar(cols + held_extra, save=save)
+    for t, st in stocks.items():
+        e = cal.get(t, {})
+        st["earnings"], st["ex_div"] = e.get("earnings"), e.get("ex_div")
+        st["earn_days"] = events.days_until(e.get("earnings"), data.local_now(m).date())
+    for p in short_picks + long_picks:
+        p["earnings"], p["earn_days"] = stocks[p["ticker"]]["earnings"], stocks[p["ticker"]]["earn_days"]
+    all_names = {**names, **m.extras}
+    upcoming = events.upcoming(cal, all_names, 7, data.local_now(m).date())
     if session == "收市後" and save:
         tracking.record(asof, reg, [p["ticker"] for p in short_picks], [p["ticker"] for p in long_picks], m.suffix)
     live = tracking.evaluate(prices, cols, m.index, m.suffix)
+    claude_live = tracking.evaluate_claude(prices, cols, m.index, m.key)
 
     ix = prices.close[m.index].iloc[-250:]
     market = {
@@ -223,7 +234,7 @@ def run(m: Market, use_news: bool = True, use_ai: bool = True, save: bool = True
 
     out = {"updated": now.strftime("%Y-%m-%d %H:%M"), "session": session, "asof": asof,
            "regime": reg, "market": market, "themes": themes, "southbound": sb_out,
-           "short": short_picks, "long": long_picks, "stocks": stocks,
+           "short": short_picks, "long": long_picks, "stocks": stocks, "upcoming": upcoming, "claude_live": claude_live,
            "news": [{k: v for k, v in it.items() if k != "ts"} for it in items[:60]],
            "backtest": bt, "live": live,
            "weights": {"short": scoring.SHORT_WEIGHTS, "long": scoring.LONG_WEIGHTS, "regime": regime.WEIGHTS}}

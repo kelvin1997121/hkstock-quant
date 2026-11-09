@@ -55,3 +55,27 @@ def evaluate(prices, stock_cols: list[str], index: str, suffix: str = "", horizo
     return {"n": len(df), "pending": len(log) - len(df), "horizon": horizon,
             "short_excess": round(float(ex.mean()), 2), "short_hit": round(float((ex > 0).mean() * 100), 1),
             "regime_hit": round(float(agree.mean() * 100), 1), "rows": rows[-20:][::-1]}
+
+
+def evaluate_claude(prices, stock_cols: list[str], index: str, market: str, horizon: int = 5) -> dict:
+    """Score Claude's logged calls: 偏升 right if the index rose over the next 5 days, 偏跌 if it fell,
+    震盪 if it moved less than 1% either way; picks scored against the universe average."""
+    p = DATA / "claude_log.json"
+    log = (json.loads(p.read_text(encoding="utf-8")) if p.exists() else {}).get(market, {})
+    c = prices.close
+    idx = {d.strftime("%Y-%m-%d"): i for i, d in enumerate(c.index)}
+    hits, ex = [], []
+    for d, e in sorted(log.items()):
+        i = idx.get(d)
+        if i is None or i + horizon >= len(c):
+            continue
+        fwd = c.iloc[i + horizon] / c.iloc[i] - 1
+        r = float(fwd[index])
+        hits.append({"偏升": r > 0, "偏跌": r < 0, "震盪": abs(r) < 0.01}.get(e["call"], False))
+        picks = [t for t in e.get("picks", []) if t in fwd and not np.isnan(fwd[t])]
+        if picks:
+            ex.append(float(fwd[picks].mean() - fwd[stock_cols].mean()) * 100)
+    if not hits:
+        return {"n": 0, "pending": len(log)}
+    return {"n": len(hits), "pending": len(log) - len(hits), "call_hit": round(float(np.mean(hits)) * 100, 1),
+            "pick_excess": round(float(np.mean(ex)), 2) if ex else None}

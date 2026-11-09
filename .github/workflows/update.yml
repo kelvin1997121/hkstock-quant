@@ -43,6 +43,29 @@ jobs:
         # scheduled: only the market(s) open around now; manual run: both
         run: python -m hkstock --market ${{ github.event_name == 'schedule' && 'auto' || 'all' }}
 
+      - name: Restore alert state
+        uses: actions/cache/restore@v4
+        with:
+          path: .alert_state
+          key: alert-state-${{ github.run_id }}
+          restore-keys: alert-state-
+
+      - name: Holdings alerts (Telegram)
+        continue-on-error: true
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          HOLDINGS: ${{ secrets.HOLDINGS }}
+          PYTHONIOENCODING: utf-8
+        run: python -m hkstock.alerts run
+
+      - name: Save alert state
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: .alert_state
+          key: alert-state-${{ github.run_id }}
+
       - name: Publish
         run: |
           git config user.name "hkstock-bot"
