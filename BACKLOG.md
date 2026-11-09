@@ -7,6 +7,7 @@
 - 唔改評分規則、權重、合格標準;唔測新指標;唔打開任何鎖定數據(見 `research/`)。
 - 唔讀寫 `private/`、唔碰 GitHub secrets、唔落盤、唔發訊息。
 - 唔改 `.github/workflows/ticker.yml` 嘅時間表;`update.yml` 只可以加檢查步驟。
+- commit 只加自己改過嘅檔案(`git add <檔案>`),唔好包括 `docs/*.json`、`data/`(由 GitHub 自動更新負責,一齊 commit 會撞車;11-10 02:50 試過一次)。
 
 ## 清單
 - [x] 1. **自動測試**:加 `tests/`(pytest)測試價位執位、買賣位次序、持倉解析、提醒邏輯、`ai_tools` 驗證;`update.yml` 喺發佈前跑測試,唔過就唔發佈。
