@@ -18,10 +18,15 @@ on:
       market:
         description: "hk, us, all, or auto (only the market(s) in session now)"
         default: all
+      test_failure:
+        description: "Fail on purpose to test the failure notice (issue + email)"
+        type: boolean
+        default: false
 
 permissions:
   actions: write   # to restart the ticker if it has stopped
   contents: write
+  issues: write    # failure notice: GitHub emails the repo owner about new issues
 
 concurrency:
   group: update
@@ -42,6 +47,12 @@ jobs:
           if [ "$active" = "0" ]; then gh workflow run ticker.yml && echo "ticker restarted"; fi
 
       - uses: actions/checkout@v7
+
+      - name: Fail on purpose (only when testing the failure notice)
+        if: ${{ inputs.test_failure }}
+        run: |
+          echo "test of the failure notice requested"
+          exit 1
 
       - uses: actions/setup-python@v7
         with:
@@ -92,4 +103,39 @@ jobs:
           git add docs/*.json data/
           if git diff --cached --quiet; then echo "no change"; exit 0; fi
           git commit -m "data: update $(TZ=Asia/Hong_Kong date '+%Y-%m-%d %H:%M') HKT"
-          for i in 1 2 3; do git pull --rebase -q && git push && break; sleep 5; done
+          pushed=0
+          for i in 1 2 3; do git pull --rebase -q && git push && { pushed=1; break; }; sleep 5; done
+          [ "$pushed" = 1 ] || { echo "::error::push failed 3 times"; exit 1; }
+
+      - name: Failure notice (open or update an issue; GitHub emails the owner)
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          when=$(TZ=Asia/Hong_Kong date '+%Y-%m-%d %H:%M')
+          title="自動更新失敗"
+          if [ "${{ inputs.test_failure }}" = "true" ]; then title="[測試] 自動更新失敗通知"; fi
+          gh label create auto-update-failure --color d73a4a --description "update.yml failed" --force >/dev/null 2>&1 || true
+          open=$(gh issue list --label auto-update-failure --state open --json number --jq '.[0].number // empty')
+          if [ -n "$open" ]; then
+            gh issue comment "$open" --body "$when HKT 再次失敗:$url"
+          else
+            gh issue create --title "$title" --label auto-update-failure --body "$when HKT 自動更新失敗,網站暫時保留上一次成功嘅數據。
+
+          執行紀錄:$url
+
+          系統恢復正常之後,呢個 issue 會自動關閉。"
+          fi
+
+      - name: Close the failure notice once updates work again
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          for n in $(gh issue list --label auto-update-failure --state open --json number --jq '.[].number'); do
+            gh issue close "$n" --comment "已恢復正常:$url"
+          done
