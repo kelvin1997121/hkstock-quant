@@ -135,6 +135,11 @@ def insider_buys(watch: dict[str, str], days: int = 14, top: int = 12) -> list[d
     from datetime import date
     from .data import DATA
     cache = DATA / "insider_cache.json"
+    # insider filings change slowly: ask the site at most once a day and reuse that list
+    if cache.exists():
+        old = json.loads(cache.read_text(encoding="utf-8"))
+        if old.get("date") == date.today().isoformat() and old.get("rows"):
+            return old["rows"]
     m = None
     for attempt in range(2):  # the site is sometimes slow
         try:
