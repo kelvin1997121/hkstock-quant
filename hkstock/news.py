@@ -84,8 +84,8 @@ def fetch(m: universe.Market, hours: int = 30) -> list[dict]:
 def tone(title: str) -> int:
     """+1 / -1 / 0 from simple keyword counts. Crude, so only used in aggregate."""
     low = title.lower()
-    p = sum(title.count(w) for w in POS) + sum(bool(re.search(rf"{re.escape(w)}", low)) for w in POS_EN)
-    n = sum(title.count(w) for w in NEG) + sum(bool(re.search(rf"{re.escape(w)}", low)) for w in NEG_EN)
+    p = sum(title.count(w) for w in POS) + sum(bool(re.search(r"\b" + re.escape(w) + r"\b", low)) for w in POS_EN)
+    n = sum(title.count(w) for w in NEG) + sum(bool(re.search(r"\b" + re.escape(w) + r"\b", low)) for w in NEG_EN)
     return (p > n) - (n > p)
 
 
