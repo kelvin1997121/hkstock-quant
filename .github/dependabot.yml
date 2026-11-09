@@ -4,6 +4,9 @@ version: 2
 updates:
   - package-ecosystem: pip
     directory: "/"
+    # only propose a change when a new version falls outside the allowed range (e.g. a new
+    # major version), not every time the minimum could be raised
+    versioning-strategy: increase-if-necessary
     schedule:
       interval: weekly
       day: saturday
