@@ -1,0 +1,30 @@
+{
+ "2026-11-09": {
+  "regime_score": -24,
+  "label": "偏淡",
+  "short": [
+   "XYZ",
+   "COST",
+   "TME",
+   "V",
+   "MCD",
+   "HD",
+   "NEM",
+   "B",
+   "AAPL",
+   "WMT"
+  ],
+  "long": [
+   "JNJ",
+   "ABBV",
+   "AAPL",
+   "CVX",
+   "MO",
+   "PFE",
+   "MRK",
+   "XOM",
+   "V",
+   "PM"
+  ]
+ }
+}
