@@ -44,3 +44,15 @@ is usable from the close of the first trading day after D.
 3. A locked pass is shown on the page as its own list with its own live log, not merged into
    the existing scores. Anything else is reported as failed and not used.
 4. If nothing passes development, the locked period is not opened.
+
+## Result (appended 2026-11-09 after both runs; rules above unchanged)
+| signal | development 2014-01..2021-10 | locked 2021-11..2026-11 |
+|---|---|---|
+| E1 earnings surprise, HK | IC +0.048, t 1.41, net +0.52% - fail | not opened |
+| E1 earnings surprise, US | IC +0.050, t 2.58, net +0.44% - **pass** | IC -0.005, t -0.22, net -0.27% - **fail** |
+| E2 analyst revisions, US | IC +0.008, t 0.58, net +0.09% - fail | not opened |
+
+Nothing is added to the system. The US earnings drift was real in 2014-2021 and gone in the
+last five years, consistent with the documented decay of this effect in large caps.
+Data note: the full-history download stamped some days twice; the script keeps one row per
+date before computing anything (no effect on the rules). Numbers: `research/results_2026-11-09b.json`.

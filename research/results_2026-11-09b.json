@@ -1,0 +1,38 @@
+{
+ "dev": {
+  "E1-hk": {
+   "n": 262,
+   "ic": 0.0483,
+   "t": 1.41,
+   "top_excess_net": 0.52,
+   "hit": 54.6,
+   "pass": false
+  },
+  "E1-us": {
+   "n": 394,
+   "ic": 0.0498,
+   "t": 2.58,
+   "top_excess_net": 0.44,
+   "hit": 59.1,
+   "pass": true
+  },
+  "E2-us": {
+   "n": 394,
+   "ic": 0.0076,
+   "t": 0.58,
+   "top_excess_net": 0.09,
+   "hit": 52.3,
+   "pass": false
+  }
+ },
+ "locked": {
+  "E1-us": {
+   "n": 249,
+   "ic": -0.005,
+   "t": -0.22,
+   "top_excess_net": -0.27,
+   "hit": 54.2,
+   "pass": false
+  }
+ }
+}
