@@ -1,0 +1,75 @@
+name: ticker
+
+# The clock for intraday updates. GitHub's own cron is unreliable on this repo (on
+# 9 Nov 2026 the scheduled runs did not fire at all), so one long job starts the
+# "update" workflow every 15 minutes while either market is in its session window
+# (HK 08:30-16:45 HKT, US 08:30-16:50 New York time, weekdays). It hands over to a
+# fresh run before the 6-hour job limit; the cron below or any update run restarts it
+# if the relay breaks. To stop the clock on purpose, disable this workflow.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "11 */2 * * *"
+
+permissions:
+  actions: write   # to start the update workflow and the next ticker run
+  contents: read
+
+concurrency:
+  group: ticker
+  cancel-in-progress: false
+
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    timeout-minutes: 355
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      EVERY: "15"
+    steps:
+      - name: Trigger updates during market hours
+        run: |
+          set +e   # a failed API call must not end the loop
+          log() { echo "$(TZ=Asia/Hong_Kong date '+%F %H:%M') $*"; }
+          in_session() {  # $1 = timezone, $2 = start HHMM, $3 = end HHMM
+            local dow hm
+            dow=$(TZ=$1 date +%u); hm=$((10#$(TZ=$1 date +%H%M)))
+            [ "$dow" -le 5 ] && [ "$hm" -ge "$2" ] && [ "$hm" -le "$3" ]
+          }
+          busy() {
+            gh run list --workflow update.yml --limit 5 --json status \
+              --jq '[.[] | select(.status != "completed")] | length' | grep -qx '[1-9][0-9]*'
+          }
+          update_age() {
+            gh run list --workflow update.yml --limit 1 --json createdAt \
+              --jq '((now - (.[0].createdAt | fromdateiso8601)) / 60) | floor'
+          }
+          end=$(( $(date +%s) + 340 * 60 ))
+          while [ "$(date +%s)" -lt "$end" ]; do
+            if in_session Asia/Hong_Kong 830 1645 || in_session America/New_York 830 1650; then
+              if ! busy; then
+                age=$(update_age)
+                if [ "${age:-999}" -ge "$EVERY" ]; then
+                  gh workflow run update.yml -f market=auto && log "triggered update (last $age min ago)"
+                fi
+              fi
+            fi
+            sleep 60
+          done
+
+  relay:
+    needs: tick
+    if: ${{ !cancelled() }}   # a failed tick still hands over
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Hand over to the next ticker run
+        run: |
+          for i in 1 2 3 4 5 6; do
+            gh workflow run ticker.yml && exit 0
+            sleep 30
+          done
+          exit 1

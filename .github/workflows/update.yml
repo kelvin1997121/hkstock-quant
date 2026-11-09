@@ -14,8 +14,13 @@ on:
     - cron: "30 18 * * 1-5"  # 02:30 HKT  美股盤中
     - cron: "40 21 * * 1-5"  # 05:40 HKT  美股收市後(記低判斷)
   workflow_dispatch:
+    inputs:
+      market:
+        description: "hk, us, all, or auto (only the market(s) in session now)"
+        default: all
 
 permissions:
+  actions: write   # to restart the ticker if it has stopped
   contents: write
 
 concurrency:
@@ -27,6 +32,15 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
+      - name: Restart the ticker if it has stopped
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          active=$(gh run list --workflow ticker.yml --limit 5 --json status             --jq '[.[] | select(.status != "completed")] | length')
+          if [ "$active" = "0" ]; then gh workflow run ticker.yml && echo "ticker restarted"; fi
+
       - uses: actions/checkout@v7
 
       - uses: actions/setup-python@v7
@@ -40,8 +54,8 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           PYTHONIOENCODING: utf-8
-        # scheduled: only the market(s) open around now; manual run: both
-        run: python -m hkstock --market ${{ github.event_name == 'schedule' && 'auto' || 'all' }}
+        # scheduled and ticker runs: only the market(s) in session; manual run: both unless chosen
+        run: python -m hkstock --market ${{ github.event_name == 'schedule' && 'auto' || inputs.market || 'all' }}
 
       - name: Restore alert state
         uses: actions/cache/restore@v4

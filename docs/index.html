@@ -86,6 +86,10 @@ textarea{width:100%;min-height:96px;font:14px/1.5 ui-monospace,Consolas,monospac
 .sizer input{width:110px;padding:5px 8px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--ink);font:inherit}
 .earn{color:var(--warn);font-size:13px;margin-top:4px;font-weight:600}
 .pred{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.livebar{display:flex;gap:14px;flex-wrap:wrap;align-items:baseline;font-size:13px;color:var(--ink2);margin:-4px 0 12px}
+.livebar b{color:var(--ink);font-size:14px}
+.livedot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--upfill);margin-right:5px;vertical-align:middle}
+.livepx{font-size:13px;margin-top:4px;font-weight:600}
 button.tbtn{background:var(--chip);color:var(--ink);border:1px solid var(--border);border-radius:8px;padding:4px 10px;cursor:pointer;font:inherit;font-size:13px}
 </style>
 </head>
@@ -100,6 +104,7 @@ button.tbtn{background:var(--chip);color:var(--ink);border:1px solid var(--borde
     <button role="tab" data-m="us" aria-selected="false">美股</button>
     <button role="tab" data-m="hold" aria-selected="false">我的持倉</button>
   </div>
+  <div class="livebar" id="livebar"></div>
   <div id="mainview">
 
   <div class="card">
@@ -319,6 +324,7 @@ function planBlock(p, kind){
 }
 
 function pickCard(p, kind){
+  PICK[p.ticker] = p;
   const f = p.fund || {};
   const fund = [f.pe!=null?`PE ${f.pe}`:"", f.yield?`息率 ${f.yield}%`:"", f.pb!=null?`PB ${f.pb}`:""].filter(Boolean).join(" · ");
   const lv = kind==="short" ? `收 ${px(p.close)} · RSI ${Math.round(p.rsi)}`
@@ -327,6 +333,7 @@ function pickCard(p, kind){
     <div style="display:flex;justify-content:space-between;align-items:center"><span class="tag">${esc(p.theme)}</span>${spark(p.spark)}</div>
     ${earnNote(p) ? `<div class="earn">${earnNote(p)}</div>` : ""}
     <div class="lv">${lv}</div>
+    <div class="livepx" data-t="${esc(p.ticker)}" data-k="${kind}"></div>
     <div class="lv">今日 <span class="${cls(p.ret1)}">${pct(p.ret1)}</span> · 5日 <span class="${cls(p.ret5)}">${pct(p.ret5)}</span> · 20日 <span class="${cls(p.ret20)}">${pct(p.ret20)}</span>${fund?"<br>"+fund:""}</div>
     ${planBlock(p, kind)}
     <ul>${(p.reasons||[]).map(r => `<li>${esc(r)}</li>`).join("")}</ul></div>`;
@@ -453,7 +460,8 @@ function renderHoldings(){
   const all = {...(DATA.hk?.stocks||{}), ...(DATA.us?.stocks||{})};
   let tot = 0, totCost = 0, below200 = 0, known = 0; const themeVal = {};
   const out = rows.map(h => {
-    const s = all[h.ticker], us = !h.ticker.endsWith(".HK"), fx = us ? USDHKD : 1;
+    const s0 = all[h.ticker], lv = s0 && LIVE[tcCode(h.ticker)], us = !h.ticker.endsWith(".HK"), fx = us ? USDHKD : 1;
+    const s = s0 && lv ? {...s0, close: lv.price, ret1: lv.pct / 100} : s0;  // live price when available
     if (!s || !isFinite(h.qty) || !isFinite(h.cost) || h.cost <= 0) return {h, s: null};
     const val = s.close * h.qty * fx, cost = h.cost * h.qty * fx; h.pl = s.close / h.cost - 1;
     tot += val; totCost += cost; known++; themeVal[s.theme] = (themeVal[s.theme]||0) + val;
@@ -485,6 +493,74 @@ function renderHoldings(){
     <div class="sub" style="margin-top:8px">分數 0-100 = 喺股票池入面排第幾(100 最強)。美股按 1 美元 = 7.8 港元計。以上只係數據整理,唔係買賣建議。</div>`;
 }
 
+// ---------------------------------------------------------------- live quotes (Tencent, every 30 s)
+// Prices only: scores, regime and levels still come from the last analysis run (every 15 min in session).
+const LIVE = {}, PICK = {};
+let liveAt = null, liveErr = false;
+const LIVE_IDX = {hk: [["hkHSI", "恒指"], ["hkHSCEI", "國企"], ["hkHSTECH", "科指"]],
+                  us: [["usINX", "標普500"], ["usIXIC", "納指"], ["usDJI", "道指"]]};
+function tcCode(t){
+  if (t.endsWith(".HK")) return "hk" + t.slice(0, -3).padStart(5, "0");
+  if (t.endsWith("-USD")) return null;  // crypto: not on this feed
+  return "us" + t.replace("-", ".");
+}
+async function fetchLive(codes){
+  codes = [...new Set(codes.filter(Boolean))];
+  for (let i = 0; i < codes.length; i += 60) {
+    const r = await fetch("https://qt.gtimg.cn/q=" + codes.slice(i, i + 60).join(","), {cache: "no-store"});
+    const txt = new TextDecoder("gbk").decode(await r.arrayBuffer());
+    for (const m of txt.matchAll(/v_([^=]+)="([^"]*)"/g)) {
+      const f = m[2].split("~"), price = parseFloat(f[3]);
+      if (f.length > 33 && price > 0) LIVE[m[1]] = {price, prev: parseFloat(f[4]), pct: parseFloat(f[32]), time: f[30]};
+    }
+  }
+}
+function liveCodes(){
+  const c = [];
+  if (view === "hold") parseHoldings($("hin").value).forEach(h => c.push(tcCode(h.ticker)));
+  else {
+    (LIVE_IDX[view] || []).forEach(x => c.push(x[0]));
+    const d = DATA[view]; if (d) [...d.short, ...d.long].forEach(p => c.push(tcCode(p.ticker)));
+  }
+  ["hk", "us"].forEach(k => LIVE_IDX[k].slice(0, 1).forEach(x => c.push(x[0])));
+  return c;
+}
+async function liveTick(){
+  if (document.hidden) return;
+  try { await fetchLive(liveCodes()); liveAt = new Date(); liveErr = false; }
+  catch (e) { liveErr = true; }
+  applyLive();
+  if (view === "hold") renderHoldings();
+}
+function applyLive(){
+  const bar = $("livebar");
+  if (liveErr && !liveAt) { bar.innerHTML = `<span class="sub">即時報價暫時取唔到,顯示最後分析數字</span>`; return; }
+  const idx = view === "hold" ? [LIVE_IDX.hk[0], LIVE_IDX.us[0]] : (LIVE_IDX[view] || []);
+  bar.innerHTML = (liveAt ? `<span><span class="livedot"></span>即時 ${liveAt.toLocaleTimeString("en-GB")}</span>` : "") +
+    idx.map(([code, name]) => { const q = LIVE[code]; return q ? `<span>${name} <b>${num(q.price, 0)}</b> <span class="${cls(q.pct / 100)}">${q.pct > 0 ? "+" : ""}${q.pct.toFixed(2)}%</span></span>` : ""; }).join("") +
+    `<span class="sub">分析數字每 15 分鐘更新</span>`;
+  document.querySelectorAll(".livepx").forEach(el => {
+    const p = PICK[el.dataset.t], q = LIVE[tcCode(el.dataset.t)];
+    if (!p || !q) { el.textContent = ""; return; }
+    let st = "", c = "";
+    if (el.dataset.k === "short") { const s = p.plan.short;
+      if (s.stop != null && q.price < s.stop) { st = "已跌穿止蝕"; c = "neg"; }
+      else if (s.t1 != null && q.price >= s.t1) { st = "已到目標1"; c = "pos"; }
+      else if (s.entry_high != null && q.price > s.entry_high) { st = "高於買入區,唔追"; c = "wrn"; }
+      else if (s.entry_low != null && q.price >= s.entry_low) { st = "喺買入區內"; c = "pos"; }
+      else { st = "低於買入區,接近止蝕"; c = "wrn"; }
+    } else { const l = p.plan.long;
+      if (l.stop != null && q.price < l.stop) { st = "跌穿長線止蝕"; c = "neg"; }
+      else if (l.zone_high != null && q.price <= l.zone_high && q.price >= (l.zone_low ?? 0)) { st = "喺收集區內"; c = "pos"; }
+      else if (l.zone_high != null && q.price > l.zone_high) { st = "高於收集區,等回調"; c = "wrn"; }
+      else { st = "低於收集區"; c = "wrn"; }
+    }
+    el.innerHTML = `即時 ${px(q.price)} <span class="${cls(q.pct / 100)}">(${q.pct > 0 ? "+" : ""}${q.pct.toFixed(2)}%)</span> · <span class="${c}">${st}</span>`;
+  });
+}
+setInterval(liveTick, 30000);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) liveTick(); });
+
 // ---------------------------------------------------------------- tabs + loading
 const DATA = {};
 let view = "hk";
@@ -495,14 +571,14 @@ function show(v){
   document.querySelectorAll(".tabs button").forEach(b => b.setAttribute("aria-selected", String(b.dataset.m === v)));
   $("mainview").hidden = v === "hold"; $("holdview").hidden = v !== "hold";
   if (v === "hold") { $("upd").textContent = "持倉分析(用港股同美股最新數據)"; renderHoldings(); }
-  else if (DATA[v]) render(DATA[v]);
+  else if (DATA[v]) { render(DATA[v]); applyLive(); }
   else $("upd").textContent = "載入中…";
 }
-document.querySelectorAll(".tabs button").forEach(b => b.onclick = () => show(b.dataset.m));
+document.querySelectorAll(".tabs button").forEach(b => b.onclick = () => { show(b.dataset.m); liveTick(); });
 $("hsave").onclick = renderHoldings;
 $("hclear").onclick = () => { $("hin").value = ""; renderHoldings(); };
 try { $("hin").value = localStorage.getItem("holdings") || ""; } catch(e){}
-const load = (k, f) => fetch(f + "?t=" + Date.now()).then(r => r.json()).then(d => { DATA[k] = d; if (view === k || view === "hold" || k === "ai") show(view); })
+const load = (k, f) => fetch(f + "?t=" + Date.now()).then(r => r.json()).then(d => { DATA[k] = d; if (view === k || view === "hold" || k === "ai") show(view); if (k === view || (view === "hold" && k !== "ai")) liveTick(); })
   .catch(e => { if (view === k) $("upd").textContent = "載入數據失敗:" + e; });
 load("hk", "data.json"); load("us", "us.json"); load("ai", "ai.json");
 try { $("pv").value = localStorage.getItem("pv") || ""; $("rp").value = localStorage.getItem("rp") || ""; } catch(e){}
