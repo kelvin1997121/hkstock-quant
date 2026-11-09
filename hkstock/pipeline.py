@@ -7,7 +7,7 @@ import math
 import numpy as np
 import pandas as pd
 
-from . import agent, backtest, data, events, flows, indicators, levels, news, regime, scoring, tracking
+from . import agent, backtest, data, events, flows, indicators, levels, news, quality, regime, scoring, tracking
 from .universe import Market
 
 
@@ -115,6 +115,16 @@ def run(m: Market, use_news: bool = True, use_ai: bool = True, save: bool = True
     cols = [c for c in prices.close.columns if c in names]
     f = indicators.features(prices)
     asof = prices.close.index[-1].strftime("%Y-%m-%d")
+
+    out_path = data.DOCS / m.out
+    prev = json.loads(out_path.read_text(encoding="utf-8")) if out_path.exists() else None
+    problems = quality.check(prices, m.index, set(names), prev)
+    if problems:
+        # keep the last good page data; GitHub shows ::warning:: lines on the run summary
+        print(f"::warning::{m.name} 數據檢查唔通過,今次唔更新:" + ";".join(problems))
+        if prev is None:
+            raise RuntimeError("data check failed and there is no earlier data to keep")
+        return prev
 
     print("  regime + flows")
     sb = flows.southbound_history() if m.key == "hk" else pd.Series(dtype=float)
