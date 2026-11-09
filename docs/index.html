@@ -606,7 +606,8 @@ function liveCodes(){
   if (view === "hold") parseHoldings($("hin").value).forEach(h => c.push(tcCode(h.ticker)));
   else {
     (LIVE_IDX[view] || []).forEach(x => c.push(x[0]));
-    const d = DATA[view]; if (d) [...d.short, ...d.long].forEach(p => c.push(tcCode(p.ticker)));
+    const d = DATA[view];
+    if (d) [...d.short, ...d.long, ...(d.sector_best || []).flatMap(g => g.picks)].forEach(p => c.push(tcCode(p.ticker)));
   }
   ["hk", "us"].forEach(k => LIVE_IDX[k].slice(0, 1).forEach(x => c.push(x[0])));
   return c;

@@ -191,11 +191,14 @@ def run(m: Market, use_news: bool = True, use_ai: bool = True, save: bool = True
     short_picks = [pick(t, float(final[t]), "short") for t in final.nlargest(10).index]
     # strongest 2 per theme, so a weak sector still shows its best names (display only, not a forecast)
     sector_best = []
+    # the sector table needs only these fields (no price chart or reasons)
+    # keep the whole plan: the page shares one lookup per ticker with the short/long cards
+    slim = lambda p: {k: p[k] for k in ("ticker", "name", "theme", "score", "ret5", "ret20", "plan")}
     for th in sorted(m.themes, key=lambda x: -heat.get(x, 0)):
         members = final[[t for t in final.index if themes_of.get(t) == th]]
         if len(members):
             sector_best.append({"theme": th, "heat": heat.get(th),
-                                "picks": [pick(t, float(members[t]), "short") for t in members.nlargest(2).index]})
+                                "picks": [slim(pick(t, float(members[t]), "short")) for t in members.nlargest(2).index]})
     lscore = long.iloc[-1].drop(labels=list(suspended), errors="ignore").dropna()
     long_picks = [pick(t, float(lscore[t]), "long") for t in lscore.nlargest(10).index]
     fund = _fundamentals([p["ticker"] for p in long_picks + short_picks])
@@ -226,7 +229,7 @@ def run(m: Market, use_news: bool = True, use_ai: bool = True, save: bool = True
         e = cal.get(t, {})
         st["earnings"], st["ex_div"] = e.get("earnings"), e.get("ex_div")
         st["earn_days"] = events.days_until(e.get("earnings"), data.local_now(m).date())
-    for p in short_picks + long_picks:
+    for p in short_picks + long_picks + [x for g in sector_best for x in g["picks"]]:
         p["earnings"], p["earn_days"] = stocks[p["ticker"]]["earnings"], stocks[p["ticker"]]["earn_days"]
     all_names = {**names, **m.extras}
     upcoming = events.upcoming(cal, all_names, 7, data.local_now(m).date())
@@ -260,7 +263,7 @@ def run(m: Market, use_news: bool = True, use_ai: bool = True, save: bool = True
            "regime": reg, "market": market, "themes": themes, "southbound": sb_out,
            "short": short_picks, "long": long_picks, "sector_best": sector_best, "stocks": stocks, "upcoming": upcoming, "claude_live": claude_live,
            "us_flow": None if m.key != "us" else {"etf": flows.etf_flows(prices, f, m), "insider": flows.insider_buys({**names, **m.extras})},
-           "news": [{k: v for k, v in it.items() if k != "ts"} for it in items[:60]],
+           "news": [{k: v for k, v in it.items() if k != "ts"} for it in items[:40]],  # page shows 40
            "backtest": bt, "live": live,
            "weights": {"short": scoring.SHORT_WEIGHTS, "long": scoring.LONG_WEIGHTS, "regime": regime.WEIGHTS}}
     out = _clean(out)
@@ -279,6 +282,6 @@ def run(m: Market, use_news: bool = True, use_ai: bool = True, save: bool = True
 
     if save:
         data.DOCS.mkdir(parents=True, exist_ok=True)
-        (data.DOCS / m.out).write_text(json.dumps(out, ensure_ascii=False, allow_nan=False), encoding="utf-8")
+        (data.DOCS / m.out).write_text(json.dumps(out, ensure_ascii=False, allow_nan=False, separators=(",", ":")), encoding="utf-8")
         print(f"  wrote {data.DOCS / m.out}")
     return out
