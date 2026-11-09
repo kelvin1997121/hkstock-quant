@@ -1,7 +1,10 @@
-yfinance>=1.8
-pandas>=2.2
-numpy>=1.26
-requests>=2.31
-feedparser>=6.0
-anthropic>=2.4
+# Upper caps stop a new major version from breaking the live system overnight.
+# Dependabot (.github/dependabot.yml) opens a pull request when a newer version is out;
+# the tests workflow runs on it, and it is merged by hand only when the tests pass.
+yfinance>=1.8,<2
+pandas>=2.2,<4
+numpy>=1.26,<3
+requests>=2.31,<3
+feedparser>=6.0,<7
+anthropic>=2.4,<3
 tzdata>=2024.1
