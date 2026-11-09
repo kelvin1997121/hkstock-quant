@@ -150,6 +150,19 @@ button.tbtn{background:var(--chip);color:var(--ink);border:1px solid var(--borde
     </div>
   </div>
 
+  <div class="grid2" id="usflow" hidden>
+    <div class="card">
+      <h2>美股資金去向(板塊 ETF)</h2>
+      <div class="sub">近 5 日估算資金流(億美元)= 每日成交額 × 收市位置(收喺全日高位 = 全部當買盤,收喺低位 = 全部當沽盤)。屬估算,唔係基金實際申購贖回。</div>
+      <div id="etfchart" style="margin-top:8px"></div>
+    </div>
+    <div class="card">
+      <h2>公司高層買入(近 14 日)</h2>
+      <div class="sub">董事同高層喺市場用自己錢買自己公司股票(美國證監會 Form 4 申報),唔計股票獎勵。<b>★</b> = 喺我哋股票池。</div>
+      <div class="scroll" style="margin-top:6px"><table id="insider"></table></div>
+    </div>
+  </div>
+
   <div class="card" id="upcard">
     <h2>未來 7 日公佈業績</h2>
     <div class="sub">業績前後股價可以一日大上大落(例如 NOK 10 月 22 日一日跌 15%),持有或者買入前要留意。</div>
@@ -239,8 +252,25 @@ function lineChart(el, dates, s1, s2, name){
   svg.onmouseleave = () => { xh.style.display="none"; xd.style.display="none"; hideTip(); };
 }
 
+function fillHeight(el, min){
+  const card = el.closest(".card"); if (!card) return min;
+  const free = card.getBoundingClientRect().bottom - el.getBoundingClientRect().top - 18;
+  return Math.max(min, Math.min(free, 420));
+}
+function hBars(el, rows){
+  // rows: [label, value, tooltipHtml]; diverging horizontal bars around zero
+  const W = el.clientWidth || 400, rowH = 22, L = 92, R = 52, H = rows.length * rowH + 6;
+  const m = Math.max(...rows.map(r => Math.abs(r[1])), 0.01), mid = L + (W - L - R) / 2, half = (W - L - R) / 2;
+  let g = `<line x1="${mid}" x2="${mid}" y1="0" y2="${H}" stroke="var(--axis)"/>`;
+  rows.forEach((r, i) => { const v = r[1], w = Math.max(Math.abs(v) / m * half, 1), y = i * rowH + 4, x = v >= 0 ? mid : mid - w;
+    g += `<text x="${L - 6}" y="${y + 13}" text-anchor="end" style="fill:var(--ink2)">${esc(r[0])}</text>
+      <rect data-i="${i}" x="${x}" y="${y}" width="${w}" height="${rowH - 6}" rx="3" fill="${v >= 0 ? 'var(--upfill)' : 'var(--down)'}"/>
+      <text x="${v >= 0 ? mid + w + 4 : mid - w - 4}" y="${y + 13}" text-anchor="${v >= 0 ? 'start' : 'end'}">${v >= 0 ? "+" : ""}${v.toFixed(1)}</text>`; });
+  el.innerHTML = `<svg width="${W}" height="${H}" role="img" aria-label="板塊ETF近5日資金流">${g}</svg>`;
+  el.querySelectorAll("rect").forEach(b => { b.onmousemove = e => showTip(e, rows[+b.dataset.i][2]); b.onmouseleave = hideTip; });
+}
 function flowBars(el, rows){
-  const W = el.clientWidth || 400, H = 180, L = 36, R = 4, T = 8, B = 20;
+  const W = el.clientWidth || 400, H = fillHeight(el, 180), L = 36, R = 4, T = 8, B = 20;
   const m = Math.max(...rows.map(r => Math.abs(r[1])), 1);
   const bw = (W-L-R)/rows.length, y = v => T + (m - v)*(H-T-B)/(2*m), y0 = y(0);
   let g = `<line x1="${L}" x2="${W-R}" y1="${y0}" y2="${y0}" stroke="var(--axis)"/>
@@ -336,9 +366,9 @@ function render(d){
   $("sbwrap").hidden = !sb;
   if (sb) {
     $("sbsum").innerHTML = sb.sum5==null ? "南向數據暫時取唔到" : `近5日淨${sb.sum5>=0?"買":"賣"} <b class="${cls(sb.sum5)}">${Math.abs(sb.sum5).toFixed(0)} 億</b> · 近20日 <b class="${cls(sb.sum20)}">${sb.sum20.toFixed(0)} 億</b>`;
-    if (sb.history.length) flowBars($("sbchart"), sb.history);
     $("sbtop").innerHTML = `<tr><th>股票</th><th>淨買(億)</th><th>今日</th><th class="l">板塊</th></tr>` +
       sb.top.slice(0,10).map(x => `<tr><td>${esc(x.name)} <span class="sub">${esc(x.ticker)}</span></td><td class="${cls(x.net)}">${num(x.net,2)}</td><td class="${cls(x.chg)}">${x.chg==null?"–":(x.chg>0?"+":"")+x.chg.toFixed(1)+"%"}</td><td class="l">${esc(x.theme||"")}</td></tr>`).join("");
+    if (sb.history.length) flowBars($("sbchart"), sb.history);  // after the table, so it can fill the card height
   }
 
   const up = d.upcoming || [];
@@ -357,6 +387,18 @@ function render(d){
     chips.push(cl && cl.n ? `Claude 實戰:方向啱 <b>${cl.call_hit}%</b>,睇好股平均跑贏股票池 <b class="${cls(cl.pick_excess)}">${cl.pick_excess}%</b>(${cl.n} 日)`
                           : `Claude 實戰紀錄:${(cl && cl.pending) || 0} 日待計分(5個交易日後開始)`);
     $("cpred").innerHTML = chips.map(c => `<div class="note" style="margin:0">${c}</div>`).join("");
+  }
+
+  const uf = d.us_flow;
+  $("usflow").hidden = !uf;
+  if (uf) {
+    hBars($("etfchart"), (uf.etf || []).map(x => [`${x.name} ${x.ticker}`, x.flow5,
+      `<b>${esc(x.name)} ${esc(x.ticker)}</b><br>5日資金流 ${x.flow5.toFixed(1)} 億美元 · 20日 ${x.flow20.toFixed(1)} 億<br>5日 ${pct(x.ret5)} · 跑贏標普 ${pct(x.rs5)}<br>成交 ${x.turn_ratio == null ? "–" : x.turn_ratio.toFixed(1) + "x"} 平時`]));
+    const ins = uf.insider || [];
+    $("insider").innerHTML = ins.length ? `<tr><th>股票</th><th>金額(萬美元)</th><th>人數</th><th class="l">職位</th><th>最近</th></tr>` +
+      ins.map(x => `<tr><td>${x.watch ? "<b>★</b> " : ""}${esc(x.ticker)} <span class="sub">${esc(x.watch || x.company)}</span></td><td>${num(x.value_k / 10, 0)}</td><td>${x.insiders}</td>
+        <td class="l sub">${esc(x.titles)}</td><td>${esc((x.last || "").slice(5))}</td></tr>`).join("")
+      : `<tr><td class="sub">暫時取唔到數據</td></tr>`;
   }
 
   $("short").innerHTML = d.short.map(p => pickCard(p, "short")).join("");

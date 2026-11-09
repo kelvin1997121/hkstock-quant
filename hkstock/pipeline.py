@@ -235,6 +235,7 @@ def run(m: Market, use_news: bool = True, use_ai: bool = True, save: bool = True
     out = {"updated": now.strftime("%Y-%m-%d %H:%M"), "session": session, "asof": asof,
            "regime": reg, "market": market, "themes": themes, "southbound": sb_out,
            "short": short_picks, "long": long_picks, "stocks": stocks, "upcoming": upcoming, "claude_live": claude_live,
+           "us_flow": None if m.key != "us" else {"etf": flows.etf_flows(prices, f, m), "insider": flows.insider_buys({**names, **m.extras})},
            "news": [{k: v for k, v in it.items() if k != "ts"} for it in items[:60]],
            "backtest": bt, "live": live,
            "weights": {"short": scoring.SHORT_WEIGHTS, "long": scoring.LONG_WEIGHTS, "regime": regime.WEIGHTS}}

@@ -94,3 +94,78 @@ def theme_flows(f: dict[str, pd.DataFrame], prices, m: universe.Market, i: int =
             "members": len(cols),
         })
     return pd.DataFrame(rows).set_index("theme")
+
+
+def etf_flows(prices, f: dict, m) -> list[dict]:
+    """US sector/asset ETFs: estimated money flow = daily dollar volume x where the close sits in the
+    day's range (+1 at the high, -1 at the low), summed over 5 and 20 days, in 億 USD. An estimate of
+    buying vs selling pressure, not actual fund creations/redemptions."""
+    c, h, l, v = prices.close, prices.high, prices.low, prices.volume
+    idx5 = c[m.index].iloc[-1] / c[m.index].iloc[-6] - 1
+    rows = []
+    for t, name in m.flow_etfs.items():
+        if t not in c or c[t].notna().sum() < 30:
+            continue
+        rng = (h[t] - l[t]).replace(0, np.nan)
+        mfm = (((c[t] - l[t]) - (h[t] - c[t])) / rng).fillna(0)
+        dv = c[t] * v[t]
+        mfv = mfm * dv
+        base = dv.iloc[-23:-3].mean()
+        rows.append({"ticker": t, "name": name,
+                     "flow5": float(mfv.iloc[-5:].sum() / 1e8), "flow20": float(mfv.iloc[-20:].sum() / 1e8),
+                     "ret1": float(c[t].iloc[-1] / c[t].iloc[-2] - 1), "ret5": float(c[t].iloc[-1] / c[t].iloc[-6] - 1),
+                     "rs5": float(c[t].iloc[-1] / c[t].iloc[-6] - 1 - idx5),
+                     "turn_ratio": float(dv.iloc[-3:].mean() / base) if base > 0 else None,
+                     "cmf20": float(f["cmf20"][t].iloc[-1]) if not pd.isna(f["cmf20"][t].iloc[-1]) else None})
+    return sorted(rows, key=lambda r: -r["flow5"])
+
+
+INSIDER_URL = ("http://openinsider.com/screener?s=&o=&pl=&ph=&ll=&lh=&fd={days}&fdr=&td=0&tdr=&fdlyl=&fdlyh="
+               "&daysago=&xp=1&vl=25&vh=&ocl=&och=&sic1=-1&sicl=100&sich=9999&grp=0&nfl=&nfh=&nil=&nih=&nol=&noh="
+               "&v2l=&v2h=&oc2l=&oc2h=&sortcol=0&cnt=1000&page=1")
+
+
+def insider_buys(watch: dict[str, str], days: int = 14, top: int = 12) -> list[dict]:
+    """Open-market purchases by company insiders (SEC Form 4, via openinsider.com), grouped by stock.
+    Large outside holders listed only as '10%' owners are left out, so this is officers and directors
+    spending their own money. Names in `watch` (our universe) are always kept and flagged."""
+    import html as htmlmod
+    import re
+    try:
+        r = requests.get(INSIDER_URL.format(days=days), headers=UA, timeout=30)
+        m = re.search(r'<table[^>]*class="tinytable"[^>]*>(.*?)</table>', r.text, re.S)
+        if not m:
+            raise ValueError("table not found")
+    except Exception as e:
+        print(f"  insider data failed: {e}")
+        return []
+    agg = {}
+    for row in re.findall(r"<tr[^>]*>(.*?)</tr>", m.group(1), re.S)[1:]:
+        raw = re.findall(r"<td[^>]*>(.*?)</td>", row, re.S)
+        if len(raw) < 13:
+            continue
+        cell = lambda i: htmlmod.unescape(re.sub(r"<[^>]+>", "", raw[i])).strip()
+        tk = re.search(r'href="/([A-Za-z.\-]+)"', raw[3])
+        title = cell(6)
+        if not tk or not cell(7).startswith("P") or title.replace(" ", "") in ("10%", ""):
+            continue
+        try:
+            value = float(re.sub(r"[^\d.]", "", cell(12)))
+        except ValueError:
+            continue
+        t = tk.group(1).upper().replace(".", "-")
+        a = agg.setdefault(t, {"ticker": t, "company": cell(4), "value": 0.0, "insiders": set(),
+                               "titles": set(), "last": ""})
+        a["value"] += value
+        a["insiders"].add(cell(5))
+        a["titles"].update(x.strip() for x in title.split(",") if x.strip())
+        a["last"] = max(a["last"], cell(2))
+    rows = []
+    for a in agg.values():
+        rows.append({"ticker": a["ticker"], "company": a["company"], "value_k": round(a["value"] / 1000),
+                     "insiders": len(a["insiders"]), "titles": "、".join(sorted(a["titles"]))[:40],
+                     "last": a["last"], "watch": watch.get(a["ticker"])})
+    rows.sort(key=lambda r: -r["value_k"])
+    keep = [r for r in rows if r["value_k"] >= 100][:top]
+    keep += [r for r in rows if r["watch"] and r not in keep]
+    return keep

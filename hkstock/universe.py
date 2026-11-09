@@ -134,6 +134,11 @@ US_THEME_KEYWORDS: dict[str, list[str]] = {
 # but kept out of the stock ranking, theme flows and backtests.
 US_EXTRAS = {"VOO": "Vanguard 標普500 ETF", "BTC-USD": "比特幣"}
 
+# Sector / asset ETFs used only to show where US money is moving (not ranked).
+US_FLOW_ETFS = {"XLK": "科技", "SMH": "半導體", "XLC": "通訊", "XLY": "非必需消費", "XLF": "金融", "XLV": "醫療",
+                "XLI": "工業", "XLE": "能源", "XLB": "原材料", "XLRE": "地產", "XLU": "公用", "XLP": "必需消費",
+                "IBIT": "比特幣", "GLD": "黃金", "TLT": "長年期美債"}
+
 US_BENCHMARKS = {"^GSPC": "標普500", "^IXIC": "納斯達克", "^DJI": "道瓊斯", "^RUT": "羅素2000"}
 
 US_GLOBAL = {
@@ -165,6 +170,7 @@ class Market:
     out: str = "data.json"
     suffix: str = ""
     extras: dict = field(default_factory=dict)
+    flow_etfs: dict = field(default_factory=dict)
 
     def names(self) -> dict[str, str]:
         return {t: n for group in self.themes.values() for t, n in group.items()}
@@ -187,7 +193,7 @@ US = Market(
     index="^GSPC", index_name="標普500", tech="^IXIC", tech_name="納指", tz="America/New_York", cost=0.001,
     google=(("美股", "zh"), ("華爾街 股市", "zh"), ("聯儲局 減息", "zh"), ("納指 科技股", "zh"),
             ("stock market today", "en"), ("Wall Street stocks", "en"), ("stocks rally OR selloff", "en")),
-    out="us.json", suffix="_us", extras=US_EXTRAS,
+    out="us.json", suffix="_us", extras=US_EXTRAS, flow_etfs=US_FLOW_ETFS,
 )
 
 MARKETS = {"hk": HK, "us": US}

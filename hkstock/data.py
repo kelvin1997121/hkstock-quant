@@ -70,7 +70,7 @@ def _split(df: pd.DataFrame, tickers: list[str]) -> Prices:
 
 def load(m: Market, period: str = "5y") -> tuple[Prices, pd.DataFrame]:
     """Returns (stock + benchmark prices, context closes)."""
-    tickers = list(m.names()) + list(m.extras) + list(m.benchmarks)
+    tickers = list(m.names()) + list(m.extras) + list(m.flow_etfs) + list(m.benchmarks)
     prices = _split(_download(tickers, period), tickers)
     # drop non-trading days (rows where the main index has no print)
     rows = prices.close[m.index].notna()
