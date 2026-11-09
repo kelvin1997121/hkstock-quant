@@ -188,9 +188,10 @@ def run(m: Market, use_news: bool = True, use_ai: bool = True, save: bool = True
     # every stock, for the holdings check on the page
     lsc = long.iloc[-1]
     stocks = {}
-    for t in cols:
+    held_extra = [t for t in m.extras if t in prices.close]
+    for t in cols + held_extra:
         v = lambda k: f[k][t].iloc[-1]
-        stocks[t] = {"name": names[t], "theme": themes_of[t], "close": float(close[t]),
+        stocks[t] = {"name": names.get(t) or m.extras[t], "theme": themes_of.get(t, "ETF及加密"), "close": float(close[t]),
                      "ret1": v("ret1"), "ret5": v("ret5"), "ret20": v("ret20"), "rsi": v("rsi14"),
                      "short_score": last.get(t), "long_score": lsc.get(t),
                      "above_ma20": v("ma20") and close[t] > v("ma20"), "above_ma50": v("ma50") and close[t] > v("ma50"),

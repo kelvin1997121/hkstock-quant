@@ -327,6 +327,8 @@ function render(d){
 const USDHKD = 7.8;
 function normTicker(t){
   t = t.trim().toUpperCase().replace(/\.HK$/, "");
+  const alias = {BTC: "BTC-USD", ETH: "ETH-USD", "BRK.B": "BRK-B"};
+  if (alias[t]) return alias[t];
   if (/^\d{1,5}$/.test(t)) { const n = String(parseInt(t, 10)); return (n.length < 4 ? n.padStart(4, "0") : n) + ".HK"; }
   return t.replace(/\./g, "-");
 }

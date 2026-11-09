@@ -90,7 +90,9 @@ US_THEMES: dict[str, dict[str, str]] = {
     "量子計算": {"IONQ": "IonQ", "RGTI": "Rigetti", "QBTS": "D-Wave"},
     "消費零售": {"WMT": "沃爾瑪", "COST": "Costco", "MCD": "麥當勞", "NKE": "Nike", "SBUX": "星巴克",
               "HD": "家得寶"},
-    "國防航天": {"LMT": "洛克希德", "RTX": "RTX", "NOC": "諾斯洛普", "RKLB": "Rocket Lab"},
+    "國防航天": {"LMT": "洛克希德", "RTX": "RTX", "NOC": "諾斯洛普", "RKLB": "Rocket Lab", "SPCX": "SpaceX"},
+    "AI網絡及光通訊": {"NOK": "諾基亞", "CIEN": "Ciena", "ANET": "Arista", "CSCO": "思科", "COHR": "Coherent"},
+    "煙草高息": {"PM": "菲利普莫里斯", "BTI": "英美煙草", "MO": "Altria"},
     "黃金礦業": {"NEM": "紐蒙特", "AEM": "Agnico Eagle", "B": "巴里克", "WPM": "Wheaton"},
 }
 
@@ -122,7 +124,15 @@ US_THEME_KEYWORDS: dict[str, list[str]] = {
               "Starbucks", "Home Depot", "零售", "retail", "consumer", "消費", "消费"],
     "國防航天": ["國防", "国防", "defense", "Lockheed", "Raytheon", "RTX", "Northrop", "Rocket Lab", "SpaceX", "太空", "軍工", "军工"],
     "黃金礦業": ["黃金", "黄金", "金價", "金价", "gold", "Newmont", "Barrick", "白銀", "白银", "silver"],
+    "AI網絡及光通訊": ["諾基亞", "诺基亚", "Nokia", "Ciena", "Arista", "思科", "Cisco", "Coherent", "光通訊", "光通讯",
+                  "光模塊", "光模块", "optical", "networking", "交換機", "交换机", "電訊設備", "电讯设备"],
+    "煙草高息": ["煙草", "烟草", "tobacco", "Philip Morris", "菲利普莫里斯", "British American Tobacco", "英美煙草",
+              "Altria", "IQOS", "Zyn", "尼古丁", "nicotine"],
 }
+
+# Holdings that are not single stocks: priced and given levels for the holdings tab,
+# but kept out of the stock ranking, theme flows and backtests.
+US_EXTRAS = {"VOO": "Vanguard 標普500 ETF", "BTC-USD": "比特幣"}
 
 US_BENCHMARKS = {"^GSPC": "標普500", "^IXIC": "納斯達克", "^DJI": "道瓊斯", "^RUT": "羅素2000"}
 
@@ -154,6 +164,7 @@ class Market:
     google: tuple = ()    # (query, language) pairs for Google News RSS
     out: str = "data.json"
     suffix: str = ""
+    extras: dict = field(default_factory=dict)
 
     def names(self) -> dict[str, str]:
         return {t: n for group in self.themes.values() for t, n in group.items()}
@@ -176,7 +187,7 @@ US = Market(
     index="^GSPC", index_name="標普500", tech="^IXIC", tech_name="納指", tz="America/New_York", cost=0.001,
     google=(("美股", "zh"), ("華爾街 股市", "zh"), ("聯儲局 減息", "zh"), ("納指 科技股", "zh"),
             ("stock market today", "en"), ("Wall Street stocks", "en"), ("stocks rally OR selloff", "en")),
-    out="us.json", suffix="_us",
+    out="us.json", suffix="_us", extras=US_EXTRAS,
 )
 
 MARKETS = {"hk": HK, "us": US}
