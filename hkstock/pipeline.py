@@ -151,7 +151,11 @@ def run(m: Market, use_news: bool = True, use_ai: bool = True, save: bool = True
     themes = theme_table(tf, nstats)
     heat = {t["theme"]: t["heat"] for t in themes}
 
-    last = short.iloc[-1].dropna()
+    # suspended / not trading: no volume in the last 10 sessions -> never picked, flagged on the page
+    suspended = {t for t in cols if prices.volume[t].iloc[-10:].sum() == 0}
+    if suspended:
+        print(f"  suspended / no trades: {', '.join(sorted(suspended))}")
+    last = short.iloc[-1].drop(labels=list(suspended), errors="ignore").dropna()
     final = last + 0.1 * pd.Series({t: heat.get(themes_of[t], 50) - 50 for t in last.index})
     close = prices.close.iloc[-1]
     atr = f["atr_pct"].iloc[-1]
@@ -175,7 +179,7 @@ def run(m: Market, use_news: bool = True, use_ai: bool = True, save: bool = True
         return row
 
     short_picks = [pick(t, float(final[t]), "short") for t in final.nlargest(10).index]
-    lscore = long.iloc[-1].dropna()
+    lscore = long.iloc[-1].drop(labels=list(suspended), errors="ignore").dropna()
     long_picks = [pick(t, float(lscore[t]), "long") for t in lscore.nlargest(10).index]
     fund = _fundamentals([p["ticker"] for p in long_picks + short_picks])
     for p in short_picks + long_picks:
@@ -198,7 +202,7 @@ def run(m: Market, use_news: bool = True, use_ai: bool = True, save: bool = True
                      "above_ma200": None if pd.isna(v("ma200")) else bool(close[t] > v("ma200")),
                      "ma20": levels.tick_round(v("ma20"), m.key), "ma50": levels.tick_round(v("ma50"), m.key),
                      "ma200": levels.tick_round(v("ma200"), m.key), "drawdown": v("drawdown"),
-                     "plan": levels.plan_for(L, t, m.key)}
+                     "plan": levels.plan_for(L, t, m.key), "suspended": t in suspended}
 
     cal = events.calendar(cols + held_extra, save=save)
     for t, st in stocks.items():
@@ -209,7 +213,9 @@ def run(m: Market, use_news: bool = True, use_ai: bool = True, save: bool = True
         p["earnings"], p["earn_days"] = stocks[p["ticker"]]["earnings"], stocks[p["ticker"]]["earn_days"]
     all_names = {**names, **m.extras}
     upcoming = events.upcoming(cal, all_names, 7, data.local_now(m).date())
-    if session == "收市後" and save:
+    # log only on the session that produced today's bar: on a holiday the latest bar is an older day,
+    # and re-logging it with newer information would flatter the live record
+    if session == "收市後" and save and asof == today:
         tracking.record(asof, reg, [p["ticker"] for p in short_picks], [p["ticker"] for p in long_picks], m.suffix)
     live = tracking.evaluate(prices, cols, m.index, m.suffix)
     claude_live = tracking.evaluate_claude(prices, cols, m.index, m.key)

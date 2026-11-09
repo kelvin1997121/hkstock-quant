@@ -60,7 +60,7 @@ jobs:
         run: python -m hkstock.alerts run
 
       - name: Save alert state
-        if: always()
+        if: always() && hashFiles('.alert_state/state.json') != ''
         uses: actions/cache/save@v4
         with:
           path: .alert_state

@@ -21,6 +21,7 @@ ROOT = Path(__file__).resolve().parent.parent
 DOCS, DATA = ROOT / "docs", ROOT / "data"
 FILES = {"hk": "data.json", "us": "us.json"}
 CALLS = ("偏升", "震盪", "偏跌")
+MAX_CHARS = 700  # prompt asks for 600; small allowance for headings
 HKT = timezone(timedelta(hours=8))
 
 
@@ -44,6 +45,13 @@ def brief(market: str) -> str:
         sb = d["southbound"]
         lines.append(f"\n## 南向:5日 {sb['sum5']} 億,20日 {sb['sum20']} 億;淨買入最多:" +
                      ", ".join(f"{x['name']}({x['ticker']}) {x['net']}億" for x in sb["top"][:6]))
+    if d.get("us_flow"):
+        uf = d["us_flow"]
+        lines.append("\n## 板塊ETF近5日估算資金流(億美元,成交額x收市位置,非實際申購贖回):" + ", ".join(
+            f"{x['name']}{x['ticker']} {x['flow5']:+.1f}(20日{x['flow20']:+.1f},5日{pc(x['ret5'])})" for x in uf.get("etf", [])))
+        if uf.get("insider"):
+            lines.append("## 公司高層近14日市場買入:" + ", ".join(
+                f"{x['ticker']}{'★' if x.get('watch') else ''} {x['value_k']}千美元({x['titles']})" for x in uf["insider"][:10]))
     for kind, title in (("short", "短炒候選"), ("long", "長揸候選")):
         lines.append(f"\n## {title}")
         for p in d[kind]:
@@ -73,6 +81,9 @@ def publish(market: str, call: str, confidence: int, picks: list[str], text: str
         raise SystemExit(f"呢啲代號唔喺數據入面:{bad}")
     if not text.strip():
         raise SystemExit("分析內容係空")
+    n = len("".join(text.split()))
+    if n > MAX_CHARS:
+        raise SystemExit(f"分析太長:{n} 字(唔計空格),上限 {MAX_CHARS},請刪減後再 publish")
     now = datetime.now(HKT).strftime("%Y-%m-%d %H:%M")
 
     ai_path = DOCS / "ai.json"

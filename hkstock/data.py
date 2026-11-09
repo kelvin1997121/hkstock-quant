@@ -75,6 +75,10 @@ def load(m: Market, period: str = "5y") -> tuple[Prices, pd.DataFrame]:
     # drop non-trading days (rows where the main index has no print)
     rows = prices.close[m.index].notna()
     prices = Prices(*(getattr(prices, f)[rows] for f in ("close", "high", "low", "volume")))
+    # a stock with no bar on a trading day (suspended, or Yahoo late with today's bar) keeps its last
+    # price for up to 5 days instead of dropping out with no price; volume for those days is 0
+    prices = Prices(prices.close.ffill(limit=5), prices.high.ffill(limit=5), prices.low.ffill(limit=5),
+                    prices.volume.fillna(0))
     try:
         g = _download(list(m.context), period)["Close"]
         g.index = pd.to_datetime(g.index).tz_localize(None)

@@ -122,7 +122,7 @@ def etf_flows(prices, f: dict, m) -> list[dict]:
 
 INSIDER_URL = ("http://openinsider.com/screener?s=&o=&pl=&ph=&ll=&lh=&fd={days}&fdr=&td=0&tdr=&fdlyl=&fdlyh="
                "&daysago=&xp=1&vl=25&vh=&ocl=&och=&sic1=-1&sicl=100&sich=9999&grp=0&nfl=&nfh=&nil=&nih=&nol=&noh="
-               "&v2l=&v2h=&oc2l=&oc2h=&sortcol=0&cnt=1000&page=1")
+               "&v2l=&v2h=&oc2l=&oc2h=&sortcol=0&cnt=300&page=1")
 
 
 def insider_buys(watch: dict[str, str], days: int = 14, top: int = 12) -> list[dict]:
@@ -131,13 +131,25 @@ def insider_buys(watch: dict[str, str], days: int = 14, top: int = 12) -> list[d
     spending their own money. Names in `watch` (our universe) are always kept and flagged."""
     import html as htmlmod
     import re
-    try:
-        r = requests.get(INSIDER_URL.format(days=days), headers=UA, timeout=30)
-        m = re.search(r'<table[^>]*class="tinytable"[^>]*>(.*?)</table>', r.text, re.S)
-        if not m:
-            raise ValueError("table not found")
-    except Exception as e:
-        print(f"  insider data failed: {e}")
+    import json
+    from datetime import date
+    from .data import DATA
+    cache = DATA / "insider_cache.json"
+    m = None
+    for attempt in range(2):  # the site is sometimes slow
+        try:
+            r = requests.get(INSIDER_URL.format(days=days), headers=UA, timeout=45)
+            m = re.search(r'<table[^>]*class="tinytable"[^>]*>(.*?)</table>', r.text, re.S)
+            if m:
+                break
+        except Exception as e:
+            print(f"  insider data attempt {attempt + 1} failed: {e}")
+    if not m:  # fall back to the last good list (marked stale), so the table does not go blank
+        if cache.exists():
+            old = json.loads(cache.read_text(encoding="utf-8"))
+            for row in old["rows"]:
+                row["stale"] = old["date"]
+            return old["rows"]
         return []
     agg = {}
     for row in re.findall(r"<tr[^>]*>(.*?)</tr>", m.group(1), re.S)[1:]:
@@ -168,4 +180,5 @@ def insider_buys(watch: dict[str, str], days: int = 14, top: int = 12) -> list[d
     rows.sort(key=lambda r: -r["value_k"])
     keep = [r for r in rows if r["value_k"] >= 100][:top]
     keep += [r for r in rows if r["watch"] and r not in keep]
+    cache.write_text(json.dumps({"date": date.today().isoformat(), "rows": keep}, ensure_ascii=False), encoding="utf-8")
     return keep

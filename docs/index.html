@@ -399,6 +399,7 @@ function render(d){
       ins.map(x => `<tr><td>${x.watch ? "<b>★</b> " : ""}${esc(x.ticker)} <span class="sub">${esc(x.watch || x.company)}</span></td><td>${num(x.value_k / 10, 0)}</td><td>${x.insiders}</td>
         <td class="l sub">${esc(x.titles)}</td><td>${esc((x.last || "").slice(5))}</td></tr>`).join("")
       : `<tr><td class="sub">暫時取唔到數據</td></tr>`;
+    if (ins.length && ins[0].stale) $("insider").insertAdjacentHTML("beforeend", `<tr><td colspan="5" class="sub">數據來源暫時連唔到,顯示 ${esc(ins[0].stale)} 嘅資料</td></tr>`);
   }
 
   $("short").innerHTML = d.short.map(p => pickCard(p, "short")).join("");
@@ -433,6 +434,7 @@ function parseHoldings(text){
 }
 function holdingNotes(s, h){
   const n = [], lp = s.plan.long, sp = s.plan.short;
+  if (s.suspended) n.push(["wrn", "近 10 日冇成交(可能停牌),價錢係最後成交價"]);
   if (earnNote(s)) n.push(["wrn", earnNote(s)]);
   if (lp.stop && s.close < lp.stop) n.push(["neg", `已跌穿長線止蝕參考位 ${px(lp.stop)}`]);
   if (s.above_ma200 === false) n.push(["neg", "企喺200天線之下,長線趨勢向下"]);

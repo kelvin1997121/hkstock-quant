@@ -29,13 +29,15 @@ HK_TICKS = [(0.25, 0.001), (0.5, 0.005), (10, 0.01), (20, 0.02), (100, 0.05), (2
             (500, 0.2), (1000, 0.5), (2000, 1), (5000, 2), (math.inf, 5)]
 
 
-def tick_round(p: float, market: str) -> float | None:
+def tick_round(p: float, market: str, mode: str = "nearest") -> float | None:
+    """Round to a valid price step. Buy levels and stops round down (never above the price
+    they came from); targets and display values round to nearest."""
     if p is None or not np.isfinite(p) or p <= 0:
         return None
-    if market == "us":
-        return round(p, 2)
-    step = next(s for lim, s in HK_TICKS if p < lim)
-    return round(round(p / step) * step, 3)
+    step = 0.01 if market == "us" else next(s for lim, s in HK_TICKS if p < lim)
+    q = p / step
+    q = math.floor(q + 1e-9) if mode == "down" else round(q)
+    return round(q * step, 3)
 
 
 def frames(prices, f: dict) -> dict[str, pd.DataFrame]:
@@ -75,18 +77,18 @@ def frames(prices, f: dict) -> dict[str, pd.DataFrame]:
 
 def plan_for(L: dict, t: str, market: str, i: int = -1) -> dict:
     g = lambda k: float(L[k][t].iloc[i]) if not pd.isna(L[k][t].iloc[i]) else None
-    r = lambda k: tick_round(g(k), market)
+    r = lambda k, mode="nearest": tick_round(g(k), market, mode)
     el, eh, st, t1 = g("entry_low"), g("entry_high"), g("stop"), g("t1")
     mid = (el + eh) / 2 if el and eh else None
     rr = (t1 - mid) / (mid - st) if mid and st and t1 and mid > st else None
     return {
-        "short": {"entry_low": r("entry_low"), "entry_high": r("entry_high"), "stop": r("stop"),
+        "short": {"entry_low": r("entry_low", "down"), "entry_high": r("entry_high", "down"), "stop": r("stop", "down"),
                   "t1": r("t1"), "t2": r("t2"), "rr": round(rr, 2) if rr else None,
                   "stop_pct": round((st / mid - 1) * 100, 1) if mid and st else None,
                   "t1_pct": round((t1 / mid - 1) * 100, 1) if mid and t1 else None},
-        "long": {"zone_low": r("zone_low"), "zone_high": r("zone_high"), "stop": r("long_stop"),
+        "long": {"zone_low": r("zone_low", "down"), "zone_high": r("zone_high", "down"), "stop": r("long_stop", "down"),
                  "target": r("long_target")},
-        "support": r("support"), "resistance": r("res20"), "high52": r("res250"),
+        "support": r("support", "down"), "resistance": r("res20"), "high52": r("res250"),
     }
 
 
