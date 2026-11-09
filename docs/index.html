@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="zh-HK">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>港股AI分析</title>
+<style>
+:root{
+  --page:#f9f9f7; --surface:#fcfcfb; --card:#ffffff; --ink:#0b0b0b; --ink2:#52514e; --muted:#898781;
+  --grid:#e1e0d9; --axis:#c3c2b7; --s1:#2a78d6; --s2:#eb6834; --up:#006300; --upfill:#0ca30c;
+  --down:#d03b3b; --warn:#b07400; --warnfill:#fab219; --border:#e6e5df; --chip:#f0efec;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --page:#0d0d0d; --surface:#1a1a19; --card:#151514; --ink:#f0efec; --ink2:#c3c2b7; --muted:#898781;
+    --grid:#2c2c2a; --axis:#383835; --s1:#3987e5; --s2:#d95926; --up:#0ca30c; --upfill:#0ca30c;
+    --down:#e66767; --warn:#fab219; --warnfill:#fab219; --border:#2c2c2a; --chip:#262624;
+  }
+}
+:root[data-theme="dark"]{
+  --page:#0d0d0d; --surface:#1a1a19; --card:#151514; --ink:#f0efec; --ink2:#c3c2b7; --muted:#898781;
+  --grid:#2c2c2a; --axis:#383835; --s1:#3987e5; --s2:#d95926; --up:#0ca30c; --upfill:#0ca30c;
+  --down:#e66767; --warn:#fab219; --warnfill:#fab219; --border:#2c2c2a; --chip:#262624;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--page);color:var(--ink);font:15px/1.55 -apple-system,"PingFang HK","Noto Sans HK","Microsoft JhengHei",sans-serif}
+.wrap{max-width:1080px;margin:0 auto;padding:16px}
+header{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+h1{font-size:22px;margin:0}
+h2{font-size:17px;margin:0 0 10px}
+.sub{color:var(--ink2);font-size:13px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:14px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.grid2>*{min-width:0}
+@media (max-width:760px){.grid2{grid-template-columns:1fr}}
+.hero{display:flex;gap:20px;align-items:center;flex-wrap:wrap}
+.big{font-size:40px;font-weight:700;line-height:1}
+.badge{display:inline-block;padding:2px 10px;border-radius:999px;font-size:13px;font-weight:600;background:var(--chip);color:var(--ink)}
+.pos{color:var(--up)} .neg{color:var(--down)} .wrn{color:var(--warn)}
+.ev{list-style:none;padding:0;margin:8px 0 0}
+.ev li{display:flex;gap:8px;align-items:flex-start;padding:4px 0;border-bottom:1px solid var(--grid);font-size:14px}
+.ev .bar{flex:0 0 64px;height:8px;margin-top:7px;background:var(--grid);border-radius:4px;position:relative;overflow:hidden}
+.ev .bar i{position:absolute;top:0;bottom:0;border-radius:4px}
+.note{background:var(--chip);border-radius:8px;padding:8px 10px;margin-top:8px;font-size:14px}
+.analysis{white-space:pre-wrap;font-size:15px}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{color:var(--muted);font-weight:500;text-align:right;padding:6px 6px;border-bottom:1px solid var(--axis);white-space:nowrap}
+td{padding:7px 6px;border-bottom:1px solid var(--grid);text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+td.l,th.l{text-align:left;white-space:normal;min-width:10em}
+td.h,th.h{text-align:left}
+.scroll{overflow-x:auto}
+.heat{display:inline-block;height:8px;border-radius:0 4px 4px 0;background:var(--s1);vertical-align:middle;margin-right:6px}
+.tag{display:inline-block;font-size:12px;padding:1px 7px;border-radius:6px;background:var(--chip);color:var(--ink2);margin:1px 2px}
+.k-hot{color:var(--up);font-weight:600}.k-warn{color:var(--warn);font-weight:600}.k-flow{color:var(--s1);font-weight:600}.k-out{color:var(--down)}
+.picks{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px}
+.pick{border:1px solid var(--border);border-radius:10px;padding:10px 12px;background:var(--surface)}
+.pick .top{display:flex;justify-content:space-between;align-items:baseline}
+.pick .nm{font-weight:600}
+.pick ul{margin:6px 0 0;padding-left:18px;font-size:13px;color:var(--ink2)}
+.pick .lv{font-size:13px;color:var(--ink2);margin-top:4px}
+.news a{color:var(--ink);text-decoration:none}
+.news a:hover{text-decoration:underline}
+.news li{padding:5px 0;border-bottom:1px solid var(--grid);font-size:14px;list-style:none}
+.news ul{padding:0;margin:0}
+.legend{display:flex;gap:14px;font-size:13px;color:var(--ink2);margin-bottom:4px}
+.legend i{display:inline-block;width:14px;height:3px;border-radius:2px;vertical-align:middle;margin-right:5px}
+svg text{fill:var(--muted);font-size:11px}
+#tip{position:fixed;pointer-events:none;background:var(--card);border:1px solid var(--axis);border-radius:8px;padding:6px 9px;font-size:13px;display:none;z-index:9;box-shadow:0 2px 8px rgba(0,0,0,.12)}
+.idx{display:flex;gap:10px;flex-wrap:wrap}
+.idx div{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:13px}
+.idx b{display:block;font-size:15px}
+.pass{color:var(--up);font-weight:600}.fail{color:var(--down);font-weight:600}
+footer{color:var(--muted);font-size:12px;padding:10px 0 30px}
+button.tbtn{background:var(--chip);color:var(--ink);border:1px solid var(--border);border-radius:8px;padding:4px 10px;cursor:pointer;font:inherit;font-size:13px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div><h1>港股AI分析</h1><div class="sub" id="upd">載入中…</div></div>
+    <button class="tbtn" id="theme">深色/淺色</button>
+  </header>
+
+  <div class="card">
+    <div class="hero">
+      <div><div class="sub">今日型勢</div><div class="big" id="rlabel">–</div></div>
+      <div><div class="sub">分數(-100 至 +100)</div><div class="big" id="rscore">–</div></div>
+      <div style="flex:1;min-width:220px"><div class="sub">部署方向</div><div id="rplan" style="font-weight:600"></div></div>
+    </div>
+    <div class="grid2" style="margin-top:12px">
+      <div><div class="sub">證據(按影響排序)</div><ul class="ev" id="evidence"></ul></div>
+      <div><div class="sub">反方證據及矛盾訊號</div><div id="against"></div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>AI 分析 <span class="badge" id="aiby"></span></h2>
+    <div class="analysis" id="analysis"></div>
+  </div>
+
+  <div class="card">
+    <h2>大市</h2>
+    <div class="idx" id="idx"></div>
+    <div class="legend" style="margin-top:10px"><span><i style="background:var(--s1)"></i>恒指</span><span><i style="background:var(--s2)"></i>50天線</span></div>
+    <div id="hsichart"></div>
+  </div>
+
+  <div class="card">
+    <h2>資金去向 · 邊個板塊最值得熱炒</h2>
+    <div class="sub">熱度 = 5日跑贏恒指 30% + 成交放大 25% + 資金流 20% + 新聞熱度 25%。「共振」= 新聞熱而且資金真係流入。</div>
+    <div class="scroll"><table id="themes"></table></div>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <h2>南向資金(港股通)</h2>
+      <div class="sub" id="sbsum"></div>
+      <div id="sbchart"></div>
+    </div>
+    <div class="card">
+      <h2>南向淨買入最多</h2>
+      <div class="scroll"><table id="sbtop"></table></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>短炒候選(1-2星期)</h2>
+    <div class="sub">止蝕 = 收市價減 2 倍 ATR;目標 = 加 3 倍 ATR。只係參考位,唔係買賣建議。</div>
+    <div class="picks" id="short" style="margin-top:10px"></div>
+  </div>
+
+  <div class="card">
+    <h2>長揸候選(3-12個月)</h2>
+    <div class="picks" id="long"></div>
+  </div>
+
+  <div class="card news">
+    <h2>今日財經新聞</h2>
+    <ul id="news"></ul>
+  </div>
+
+  <div class="card">
+    <h2>準唔準?回測及實戰紀錄</h2>
+    <div class="sub">合格標準喺第一次回測之前定好,之後唔會為咗靚數而改。股票池係現時嘅股票(有倖存者偏差,回測會偏好睇)。</div>
+    <div class="scroll" style="margin-top:8px"><table id="bt"></table></div>
+    <div id="live" style="margin-top:12px"></div>
+  </div>
+
+  <footer>數據:Yahoo Finance(延遲約15分鐘)、東方財富(南向資金)、RTHK / 經濟通 / Google News。
+  本頁只係數據分析工具,唔係投資建議;過往表現唔代表將來,投資有風險,自己決定自己負責。</footer>
+</div>
+<div id="tip"></div>
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const pct = (v, d=1) => v==null ? "–" : (v>=0?"+":"") + (v*100).toFixed(d) + "%";
+const cls = v => v==null || Math.abs(v) < 0.0005 ? "" : v>0 ? "pos" : "neg";
+const num = (v, d=2) => v==null ? "–" : Number(v).toLocaleString("en", {maximumFractionDigits:d, minimumFractionDigits:d});
+const tip = $("tip");
+function showTip(e, html){ tip.innerHTML = html; tip.style.display="block";
+  const x = Math.min(e.clientX + 14, innerWidth - tip.offsetWidth - 8); tip.style.left = x+"px"; tip.style.top = (e.clientY + 14)+"px"; }
+function hideTip(){ tip.style.display="none"; }
+
+try { const t = localStorage.getItem("theme"); if (t) document.documentElement.dataset.theme = t; } catch(e){}
+$("theme").onclick = () => {
+  const dark = matchMedia("(prefers-color-scheme: dark)").matches;
+  const cur = document.documentElement.dataset.theme || (dark ? "dark" : "light");
+  const nxt = cur === "dark" ? "light" : "dark";
+  document.documentElement.dataset.theme = nxt; try { localStorage.setItem("theme", nxt); } catch(e){}
+};
+
+function lineChart(el, dates, s1, s2){
+  const W = el.clientWidth || 600, H = 220, L = 46, R = 8, T = 8, B = 22;
+  const vals = s1.concat(s2.filter(v => v!=null));
+  let lo = Math.min(...vals), hi = Math.max(...vals); const pad = (hi-lo)*0.06; lo -= pad; hi += pad;
+  const x = i => L + i*(W-L-R)/(dates.length-1), y = v => T + (hi-v)*(H-T-B)/(hi-lo);
+  const path = s => s.map((v,i) => v==null ? "" : `${i && s[i-1]!=null ? "L":"M"}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join("");
+  let g = "";
+  for (let k=0;k<=4;k++){ const v = lo + (hi-lo)*k/4; g += `<line x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}" stroke="var(--grid)"/><text x="${L-6}" y="${y(v)+4}" text-anchor="end">${Math.round(v).toLocaleString()}</text>`; }
+  for (let k=0;k<dates.length;k+=Math.ceil(dates.length/5)) g += `<text x="${x(k)}" y="${H-6}" text-anchor="middle">${dates[k].slice(2,7)}</text>`;
+  el.innerHTML = `<svg width="${W}" height="${H}" role="img" aria-label="恒指走勢及50天線">${g}
+    <path d="${path(s2)}" fill="none" stroke="var(--s2)" stroke-width="2"/>
+    <path d="${path(s1)}" fill="none" stroke="var(--s1)" stroke-width="2"/>
+    <line id="xh" y1="${T}" y2="${H-B}" stroke="var(--axis)" style="display:none"/>
+    <circle id="xd" r="4" fill="var(--s1)" stroke="var(--surface)" stroke-width="2" style="display:none"/>
+    <rect x="${L}" y="0" width="${W-L-R}" height="${H}" fill="transparent"/></svg>`;
+  const svg = el.querySelector("svg"), xh = svg.querySelector("#xh"), xd = svg.querySelector("#xd");
+  svg.onmousemove = e => { const r = svg.getBoundingClientRect(); const i = Math.max(0, Math.min(dates.length-1, Math.round((e.clientX-r.left-L)/(W-L-R)*(dates.length-1))));
+    xh.setAttribute("x1", x(i)); xh.setAttribute("x2", x(i)); xh.style.display=""; xd.setAttribute("cx", x(i)); xd.setAttribute("cy", y(s1[i])); xd.style.display="";
+    showTip(e, `<b>${dates[i]}</b><br>恒指 ${num(s1[i],0)}<br>50天線 ${num(s2[i],0)}`); };
+  svg.onmouseleave = () => { xh.style.display="none"; xd.style.display="none"; hideTip(); };
+}
+
+function flowBars(el, rows){
+  const W = el.clientWidth || 400, H = 180, L = 36, R = 4, T = 8, B = 20;
+  const m = Math.max(...rows.map(r => Math.abs(r[1])), 1);
+  const bw = (W-L-R)/rows.length, y = v => T + (m - v)*(H-T-B)/(2*m), y0 = y(0);
+  let g = `<line x1="${L}" x2="${W-R}" y1="${y0}" y2="${y0}" stroke="var(--axis)"/>
+    <text x="${L-4}" y="${y(m)+4}" text-anchor="end">${Math.round(m)}</text><text x="${L-4}" y="${y(-m)+4}" text-anchor="end">-${Math.round(m)}</text>`;
+  rows.forEach((r,i) => { const v = r[1], top = Math.min(y(v), y0), h = Math.max(Math.abs(y(v)-y0), 1);
+    g += `<rect data-i="${i}" x="${L+i*bw+1}" y="${top}" width="${Math.max(bw-2,1)}" height="${h}" rx="2" fill="${v>=0?'var(--upfill)':'var(--down)'}"/>`; });
+  g += `<text x="${L}" y="${H-5}">${rows[0][0].slice(5)}</text><text x="${W-R}" y="${H-5}" text-anchor="end">${rows.at(-1)[0].slice(5)}</text>`;
+  el.innerHTML = `<svg width="${W}" height="${H}" role="img" aria-label="南向資金每日淨買入(億)">${g}</svg>`;
+  el.querySelectorAll("rect").forEach(b => { b.onmousemove = e => { const r = rows[+b.dataset.i]; showTip(e, `<b>${r[0]}</b><br>淨${r[1]>=0?"買":"賣"} ${Math.abs(r[1]).toFixed(1)} 億`); }; b.onmouseleave = hideTip; });
+}
+
+function spark(vals){
+  const W = 90, H = 26, lo = Math.min(...vals), hi = Math.max(...vals), d = hi-lo || 1;
+  const p = vals.map((v,i) => `${i?"L":"M"}${(i*W/(vals.length-1)).toFixed(1)},${(H-2-(v-lo)*(H-4)/d).toFixed(1)}`).join("");
+  return `<svg width="${W}" height="${H}" aria-label="60日走勢"><path d="${p}" fill="none" stroke="var(--s1)" stroke-width="1.5"/></svg>`;
+}
+
+function pickCard(p, kind){
+  const f = p.fund || {};
+  const fund = [f.pe!=null?`PE ${f.pe}`:"", f.yield?`息率 ${f.yield}%`:"", f.pb!=null?`PB ${f.pb}`:""].filter(Boolean).join(" · ");
+  const lv = kind==="short" ? `收 ${num(p.close,2)} · 止蝕 <span class="neg">${num(p.stop,2)}</span> · 目標 <span class="pos">${num(p.target,2)}</span>`
+                            : `收 ${num(p.close,2)} · 一年動力 ${pct(p.mom_12_1,0)} · 波幅 ${(p.vol60*100).toFixed(0)}%`;
+  return `<div class="pick"><div class="top"><span><span class="nm">${esc(p.name)}</span> <span class="sub">${esc(p.ticker)}</span></span><span class="badge">${Math.round(p.score)}分</span></div>
+    <div style="display:flex;justify-content:space-between;align-items:center"><span class="tag">${esc(p.theme)}</span>${spark(p.spark)}</div>
+    <div class="lv">${lv}</div>
+    <div class="lv">今日 <span class="${cls(p.ret1)}">${pct(p.ret1)}</span> · 5日 <span class="${cls(p.ret5)}">${pct(p.ret5)}</span> · 20日 <span class="${cls(p.ret20)}">${pct(p.ret20)}</span>${fund?"<br>"+fund:""}</div>
+    <ul>${(p.reasons||[]).map(r => `<li>${esc(r)}</li>`).join("")}</ul></div>`;
+}
+
+function render(d){
+  $("upd").textContent = `更新:${d.updated} HKT(${d.session},數據截至 ${d.asof})`;
+  const r = d.regime;
+  $("rlabel").textContent = r.label;
+  $("rscore").textContent = (r.score>0?"+":"") + Math.round(r.score);
+  $("rscore").className = "big " + cls(r.score);
+  $("rplan").textContent = r.plan;
+  const maxImp = Math.max(...r.evidence.map(e => Math.abs(e.impact)), 1);
+  $("evidence").innerHTML = r.evidence.map(e => {
+    const w = Math.abs(e.impact)/maxImp*50, left = e.impact>=0 ? 50 : 50-w;
+    return `<li><span class="bar"><i style="left:${left}%;width:${w}%;background:${e.impact>=0?'var(--upfill)':'var(--down)'}"></i></span><span>${esc(e.text)} <span class="${cls(e.impact)}">(${e.impact>0?"+":""}${e.impact})</span></span></li>`; }).join("");
+  const ag = r.against.map(e => `<div class="note">反方:${esc(e.text)}</div>`).join("") + r.notes.map(n => `<div class="note">${esc(n)}</div>`).join("");
+  $("against").innerHTML = ag || `<div class="note">今日證據方向大致一致,未見明顯矛盾。</div>`;
+  $("analysis").textContent = d.analysis.text;
+  $("aiby").textContent = d.analysis.by === "Claude" ? "Claude 撰寫" : "系統規則撰寫";
+
+  const ix = Object.values(d.market.indices).map(v => `<div>${esc(v.name)}<b>${num(v.close,0)}</b><span class="${cls(v.ret1)}">${pct(v.ret1)}</span></div>`);
+  const gl = Object.values(d.market.global).map(v => `<div>${esc(v.name)} <span class="sub">${v.date}</span><b>${num(v.close,2)}</b><span class="${cls(v.ret1)}">${pct(v.ret1)}</span></div>`);
+  $("idx").innerHTML = ix.concat(gl).join("");
+  lineChart($("hsichart"), d.market.hsi.map(x => x[0]), d.market.hsi.map(x => x[1]), d.market.hsi_ma50);
+
+  const hmax = Math.max(...d.themes.map(t => t.heat));
+  $("themes").innerHTML = `<tr><th>板塊</th><th class="h">熱度</th><th>今日</th><th>5日跑贏恒指</th><th>成交倍數</th><th>資金流</th><th>新聞(今日/平均)</th><th class="l">判斷</th></tr>` +
+    d.themes.map(t => `<tr><td>${esc(t.theme)}</td><td class="h"><span class="heat" style="width:${(t.heat/hmax*60).toFixed(0)}px"></span>${Math.round(t.heat)}</td>
+      <td class="${cls(t.ret1)}">${pct(t.ret1)}</td><td class="${cls(t.rs5)}">${pct(t.rs5)}</td><td>${num(t.turn_ratio,1)}x</td>
+      <td class="${cls(t.cmf5)}">${num(t.cmf5,2)}</td><td>${t.news_count} / ${num(t.news_baseline,1)}</td><td class="l k-${t.kind}">${esc(t.verdict)}</td></tr>`).join("");
+
+  const sb = d.southbound;
+  $("sbsum").innerHTML = sb.sum5==null ? "南向數據暫時取唔到" : `近5日淨${sb.sum5>=0?"買":"賣"} <b class="${cls(sb.sum5)}">${Math.abs(sb.sum5).toFixed(0)} 億</b> · 近20日 <b class="${cls(sb.sum20)}">${sb.sum20.toFixed(0)} 億</b>`;
+  if (sb.history.length) flowBars($("sbchart"), sb.history);
+  $("sbtop").innerHTML = `<tr><th>股票</th><th>淨買(億)</th><th>今日</th><th class="l">板塊</th></tr>` +
+    sb.top.slice(0,10).map(x => `<tr><td>${esc(x.name)} <span class="sub">${esc(x.ticker)}</span></td><td class="${cls(x.net)}">${num(x.net,2)}</td><td class="${cls(x.chg)}">${x.chg==null?"–":(x.chg>0?"+":"")+x.chg.toFixed(1)+"%"}</td><td class="l">${esc(x.theme||"")}</td></tr>`).join("");
+
+  $("short").innerHTML = d.short.map(p => pickCard(p, "short")).join("");
+  $("long").innerHTML = d.long.map(p => pickCard(p, "long")).join("");
+  $("news").innerHTML = d.news.slice(0,40).map(n => `<li><span class="sub">${esc(n.time)} ${esc(n.source)}</span> <a href="${esc(n.link)}" target="_blank" rel="noopener">${esc(n.title)}</a> ${n.themes.map(t => `<span class="tag">${esc(t)}</span>`).join("")}</li>`).join("");
+
+  const b = d.backtest, row = (name, x, metric) => x ? `<tr><td>${name}</td><td>${x.start} 至 ${x.end}</td><td>${x.n}</td><td>${metric}</td><td>${x.t}</td><td class="${x.pass?"pass":"fail"}">${x.pass?"合格":"未證實有效"}</td><td class="l sub">${esc(x.rule)}</td></tr>` : "";
+  $("bt").innerHTML = `<tr><th>測試</th><th>期間</th><th>樣本</th><th>結果</th><th>t值</th><th>結論</th><th class="l">合格標準</th></tr>` +
+    row("短炒分數", b.short, b.short ? `頭10隻每5日跑贏平均 ${b.short.top_excess}%(扣成本 ${b.short.top_excess_net}%),勝率 ${b.short.hit}%` : "") +
+    row("長揸分數", b.long, b.long ? `頭10隻每60日跑贏平均 ${b.long.top_excess}%,勝率 ${b.long.hit}%` : "") +
+    row("型勢判斷", b.regime, b.regime ? `偏好/強勢後5日恒指平均 ${b.regime.bull_ret}%,偏淡/弱勢後 ${b.regime.bear_ret}%(全部平均 ${b.regime.all_ret}%)` : "");
+  const lv = d.live;
+  $("live").innerHTML = lv.n ? `<div class="sub">實戰紀錄(每日收市後記低,5日後計分):${lv.n} 日已計分</div>
+      <div class="note">短炒頭10隻平均跑贏股票池 <b class="${cls(lv.short_excess)}">${lv.short_excess}%</b>(勝率 ${lv.short_hit}%)· 型勢方向啱 ${lv.regime_hit}%</div>`
+    : `<div class="note">實戰紀錄:已記低 ${lv.pending} 日嘅判斷,5個交易日後開始計分。呢個先係最真實嘅準確度。</div>`;
+}
+
+fetch("data.json?t=" + Date.now()).then(r => r.json()).then(render).catch(e => { $("upd").textContent = "載入數據失敗:" + e; });
+let rt; addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(() => fetch("data.json").then(r => r.json()).then(render), 200); });
+</script>
+</body>
+</html>

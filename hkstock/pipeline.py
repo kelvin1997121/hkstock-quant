@@ -1,0 +1,226 @@
+﻿"""One full run: data -> features -> regime -> flows -> news -> picks -> backtest -> page data."""
+from __future__ import annotations
+
+import json
+import math
+
+import numpy as np
+import pandas as pd
+
+from . import agent, backtest, data, flows, indicators, news, regime, scoring, tracking, universe
+
+
+def _num(v, nd=4):
+    if v is None:
+        return None
+    try:
+        v = float(v)
+    except (TypeError, ValueError):
+        return v
+    return None if math.isnan(v) or math.isinf(v) else round(v, nd)
+
+
+def _clean(o):
+    if isinstance(o, dict):
+        return {k: _clean(v) for k, v in o.items()}
+    if isinstance(o, (list, tuple)):
+        return [_clean(v) for v in o]
+    if isinstance(o, (float, np.floating, np.integer)):
+        return _num(o)
+    if isinstance(o, (np.bool_,)):
+        return bool(o)
+    return o
+
+
+def _fundamentals(tickers: list[str]) -> dict:
+    out = {}
+    try:
+        import yfinance as yf
+        for t in tickers:
+            try:
+                info = yf.Ticker(t).info
+                out[t] = {"pe": _num(info.get("trailingPE"), 1),
+                          "yield": _num((info.get("trailingAnnualDividendYield") or 0) * 100, 2),
+                          "pb": _num(info.get("priceToBook"), 2),
+                          "mcap_bn": _num((info.get("marketCap") or 0) / 1e8, 0)}
+            except Exception:
+                pass
+    except Exception as e:
+        print(f"  fundamentals skipped: {e}")
+    return out
+
+
+def theme_table(tf: pd.DataFrame, nstats: dict) -> list[dict]:
+    tf = tf.copy()
+    tf["news_count"] = [nstats.get(t, {}).get("count", 0) for t in tf.index]
+    tf["news_baseline"] = [nstats.get(t, {}).get("baseline", 0) for t in tf.index]
+    tf["news_surge"] = [nstats.get(t, {}).get("surge", 1) for t in tf.index]
+    tf["news_tone"] = [nstats.get(t, {}).get("tone", 0) for t in tf.index]
+    r = lambda col: tf[col].rank(pct=True).fillna(0.5)
+    tf["heat"] = (0.30 * r("rs5") + 0.25 * r("turn_ratio") + 0.20 * r("cmf5") + 0.25 * r("news_surge")) * 100
+    rows = []
+    for th, x in tf.sort_values("heat", ascending=False).iterrows():
+        news_hot = x["news_count"] >= 3 and x["news_surge"] >= 1.5
+        flow_ok = x["cmf5"] > 0 and x["rs5"] > 0
+        flow_strong = x["rs5"] > 0.02 and x["turn_ratio"] > 1.2 and x["cmf5"] > 0
+        if news_hot and flow_ok:
+            verdict, kind = "新聞+資金共振,最值得留意", "hot"
+        elif news_hot:
+            verdict, kind = "新聞熱但資金冇跟,小心炒消息", "warn"
+        elif flow_strong:
+            verdict, kind = "資金先行,新聞未熱", "flow"
+        elif x["rs5"] < -0.02 and x["cmf5"] < 0:
+            verdict, kind = "資金流出,暫避", "out"
+        else:
+            verdict, kind = "觀望", "none"
+        rows.append({"theme": th, **{k: x[k] for k in ("ret1", "ret5", "ret20", "rs5", "rs20", "turn_ratio",
+                                                       "cmf5", "up_share", "turnover_bn", "news_count",
+                                                       "news_baseline", "news_surge", "news_tone", "heat")},
+                     "verdict": verdict, "kind": kind})
+    return rows
+
+
+def fallback_text(reg: dict, themes: list[dict], short: list[dict], long: list[dict]) -> str:
+    p = [f"【今日型勢】{reg['label']}(分數 {reg['score']:+.0f})。{reg['plan']}。"]
+    top = reg["evidence"][:3]
+    if top:
+        p.append("主要理由:" + ";".join(e["text"] for e in top) + "。")
+    if reg["against"]:
+        p.append("反方證據:" + ";".join(e["text"] for e in reg["against"][:2]) + "。")
+    for n in reg["notes"][:3]:
+        p.append(n + "。")
+    hot = [t for t in themes if t["kind"] in ("hot", "flow")][:2]
+    warn = [t for t in themes if t["kind"] == "warn"][:2]
+    if hot:
+        p.append("【資金去向】" + ";".join(
+            f"{t['theme']}({t['verdict']},5日跑贏恒指 {t['rs5'] * 100:+.1f}%,成交 {t['turn_ratio']:.1f} 倍)" for t in hot) + "。")
+    if warn:
+        p.append("【提防】" + "、".join(t["theme"] for t in warn) + " 新聞多但資金未跟,追入風險高。")
+    if short:
+        p.append("【短炒候選】" + "、".join(f"{s['name']}({s['ticker']})" for s in short[:4]) +
+                 ",參考止蝕位已列出,跌穿要走。")
+    if long:
+        p.append("【長揸候選】" + "、".join(f"{s['name']}({s['ticker']})" for s in long[:4]) + ",可分段收集。")
+    p.append("以上只係數據分析,唔係投資建議。")
+    return "\n".join(p)
+
+
+def run(use_news: bool = True, use_ai: bool = True, save: bool = True) -> dict:
+    now = data.now_hkt()
+    session = data.market_session(now)
+    print(f"[{now:%Y-%m-%d %H:%M} HKT] {session} - loading prices")
+    prices, g = data.load()
+    names, themes_of = universe.stock_names(), universe.stock_theme()
+    cols = [c for c in prices.close.columns if c in names]
+    f = indicators.features(prices)
+    asof = prices.close.index[-1].strftime("%Y-%m-%d")
+
+    print("  regime + southbound")
+    sb = flows.southbound_history()
+    x = regime.inputs(prices, f, g, sb, cols)
+    comp = regime.components(x)
+    rscore = regime.score(comp)
+    # live row: use the freshest global/southbound numbers, not the "as known before that day's open" version
+    live_x = x.iloc[-1].copy()
+    if not g.empty:
+        for col in ("^GSPC", "^IXIC"):
+            if col in g:
+                live_x[col] = g[col].dropna().pct_change().iloc[-1]
+        if "^VIX" in g:
+            live_x["vix"] = g["^VIX"].dropna().iloc[-1]
+        if "CNY=X" in g:
+            s = g["CNY=X"].dropna()
+            if len(s) > 6:
+                live_x["cnh5"] = s.iloc[-1] / s.iloc[-6] - 1
+    if len(sb):
+        live_x["sb5"] = sb.iloc[-5:].sum()
+    live_comp = regime.components(pd.DataFrame([live_x])).iloc[0]
+    live_score = float(regime.score(pd.DataFrame([live_comp])).iloc[0])
+    reg = regime.explain(live_x, live_comp, live_score)
+
+    print("  scores")
+    short = scoring.short_score(f, cols)
+    long = scoring.long_score(f, cols)
+
+    print("  news")
+    items = news.fetch() if use_news else []
+    nstats = news.theme_stats(items, now.strftime("%Y-%m-%d"), save=save) if use_news else {}
+    tf = flows.theme_flows(f, prices)
+    themes = theme_table(tf, nstats)
+    heat = {t["theme"]: t["heat"] for t in themes}
+
+    last = short.iloc[-1].dropna()
+    final = last + 0.1 * pd.Series({t: heat.get(themes_of[t], 50) - 50 for t in last.index})
+    close = prices.close.iloc[-1]
+    atr = f["atr_pct"].iloc[-1]
+
+    def pick(t, sc, kind):
+        c = float(close[t])
+        a = float(atr[t]) if not pd.isna(atr[t]) else 0.03
+        row = {"ticker": t, "name": names[t], "theme": themes_of[t], "score": sc, "close": c,
+               "ret1": f["ret1"][t].iloc[-1], "ret5": f["ret5"][t].iloc[-1], "ret20": f["ret20"][t].iloc[-1],
+               "rsi": f["rsi14"][t].iloc[-1], "turn_ratio": f["turn_ratio"][t].iloc[-1],
+               "spark": [round(float(v), 3) for v in prices.close[t].iloc[-60:].ffill().tolist()]}
+        if kind == "short":
+            row.update(short_score=float(last[t]), theme_heat=heat.get(themes_of[t]),
+                       stop=round(c * (1 - 2 * a), 3), target=round(c * (1 + 3 * a), 3), atr_pct=a,
+                       reasons=scoring.short_reasons(f, t))
+        else:
+            row.update(mom_12_1=f["mom_12_1"][t].iloc[-1], vol60=f["vol60"][t].iloc[-1],
+                       drawdown=f["drawdown"][t].iloc[-1], reasons=scoring.long_reasons(f, t))
+        return row
+
+    short_picks = [pick(t, float(final[t]), "short") for t in final.nlargest(10).index]
+    lscore = long.iloc[-1].dropna()
+    long_picks = [pick(t, float(lscore[t]), "long") for t in lscore.nlargest(10).index]
+    fund = _fundamentals([p["ticker"] for p in long_picks + short_picks])
+    for p in short_picks + long_picks:
+        p["fund"] = fund.get(p["ticker"])
+
+    print("  backtest")
+    bt = backtest.run(prices, short, long, rscore)
+    if session == "收市後" and save:
+        tracking.record(asof, reg, [p["ticker"] for p in short_picks], [p["ticker"] for p in long_picks])
+    live = tracking.evaluate(prices, cols)
+
+    hsi = prices.close["^HSI"].iloc[-250:]
+    market = {
+        "hsi": [[d.strftime("%Y-%m-%d"), round(float(v), 1)] for d, v in hsi.items()],
+        "hsi_ma50": [None if pd.isna(v) else round(float(v), 1)
+                     for v in prices.close["^HSI"].rolling(50).mean().iloc[-250:]],
+        "indices": {k: {"name": n, "close": prices.close[k].iloc[-1],
+                        "ret1": f["ret1"][k].iloc[-1], "ret5": f["ret5"][k].iloc[-1]}
+                    for k, n in universe.BENCHMARKS.items() if k in prices.close},
+        "global": {k: {"name": n, "close": g[k].dropna().iloc[-1],
+                       "ret1": g[k].dropna().pct_change().iloc[-1],
+                       "date": g[k].dropna().index[-1].strftime("%m-%d")}
+                   for k, n in universe.GLOBAL.items() if not g.empty and k in g and g[k].notna().any()},
+    }
+    sb_out = {"history": [[d.strftime("%Y-%m-%d"), round(float(v), 1)] for d, v in sb.iloc[-30:].items()],
+              "top": flows.southbound_top(), "sum5": _num(sb.iloc[-5:].sum(), 1) if len(sb) else None,
+              "sum20": _num(sb.iloc[-20:].sum(), 1) if len(sb) else None}
+
+    out = {"updated": now.strftime("%Y-%m-%d %H:%M"), "session": session, "asof": asof,
+           "regime": reg, "market": market, "themes": themes, "southbound": sb_out,
+           "short": short_picks, "long": long_picks,
+           "news": [{k: v for k, v in it.items() if k != "ts"} for it in items[:60]],
+           "backtest": bt, "live": live,
+           "weights": {"short": scoring.SHORT_WEIGHTS, "long": scoring.LONG_WEIGHTS, "regime": regime.WEIGHTS}}
+    out = _clean(out)
+
+    ai = None
+    if use_ai:
+        print("  agent")
+        payload = {"regime": reg, "themes": themes[:8], "southbound": {"sum5": sb_out["sum5"], "top": sb_out["top"][:6]},
+                   "short": [{k: p[k] for k in ("ticker", "name", "theme", "score", "close", "stop", "reasons")} for p in short_picks[:6]],
+                   "long": [{k: p[k] for k in ("ticker", "name", "theme", "score", "reasons", "fund")} for p in long_picks[:6]],
+                   "headlines": [it["title"] for it in items[:25]], "backtest": bt, "session": session}
+        ai = agent.analyse(_clean(payload))
+    out["analysis"] = {"text": ai["text"], "by": "Claude"} if ai else \
+        {"text": fallback_text(reg, themes, short_picks, long_picks), "by": "系統規則"}
+
+    if save:
+        data.DOCS.mkdir(parents=True, exist_ok=True)
+        (data.DOCS / "data.json").write_text(json.dumps(out, ensure_ascii=False, allow_nan=False), encoding="utf-8")
+        print(f"  wrote {data.DOCS / 'data.json'}")
+    return out
