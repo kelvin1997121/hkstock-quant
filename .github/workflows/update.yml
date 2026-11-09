@@ -7,7 +7,12 @@ on:
     - cron: "15 2 * * 1-5"   # 10:15 HKT  開市後
     - cron: "10 4 * * 1-5"   # 12:10 HKT  午市收
     - cron: "30 6 * * 1-5"   # 14:30 HKT  下午
-    - cron: "35 8 * * 1-5"   # 16:35 HKT  收市後(記低當日判斷,用嚟計實戰準確度)
+    - cron: "35 8 * * 1-5"   # 16:35 HKT  港股收市後(記低當日判斷,用嚟計實戰準確度)
+    # 美股(美國時間 8:00-18:30 先會真係跑,所以夏令/冬令時間都啱)
+    - cron: "15 13 * * 1-5"  # 21:15 HKT  美股開市前
+    - cron: "0 16 * * 1-5"   # 00:00 HKT  美股盤中
+    - cron: "30 18 * * 1-5"  # 02:30 HKT  美股盤中
+    - cron: "40 21 * * 1-5"  # 05:40 HKT  美股收市後(記低判斷)
   workflow_dispatch:
 
 permissions:
@@ -35,13 +40,14 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           PYTHONIOENCODING: utf-8
-        run: python -m hkstock
+        # scheduled: only the market(s) open around now; manual run: both
+        run: python -m hkstock --market ${{ github.event_name == 'schedule' && 'auto' || 'all' }}
 
       - name: Publish
         run: |
           git config user.name "hkstock-bot"
           git config user.email "hkstock-bot@users.noreply.github.com"
-          git add docs/data.json data/
+          git add docs/*.json data/
           if git diff --cached --quiet; then echo "no change"; exit 0; fi
           git commit -m "data: update $(TZ=Asia/Hong_Kong date '+%Y-%m-%d %H:%M') HKT"
           for i in 1 2 3; do git pull --rebase -q && git push && break; sleep 5; done

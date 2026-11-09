@@ -7,7 +7,8 @@ import math
 import numpy as np
 import pandas as pd
 
-from . import agent, backtest, data, flows, indicators, news, regime, scoring, tracking, universe
+from . import agent, backtest, data, flows, indicators, levels, news, regime, scoring, tracking
+from .universe import Market
 
 
 def _num(v, nd=4):
@@ -80,7 +81,7 @@ def theme_table(tf: pd.DataFrame, nstats: dict) -> list[dict]:
     return rows
 
 
-def fallback_text(reg: dict, themes: list[dict], short: list[dict], long: list[dict]) -> str:
+def fallback_text(reg: dict, themes: list[dict], short: list[dict], long: list[dict], index_name: str) -> str:
     p = [f"【今日型勢】{reg['label']}(分數 {reg['score']:+.0f})。{reg['plan']}。"]
     top = reg["evidence"][:3]
     if top:
@@ -93,7 +94,7 @@ def fallback_text(reg: dict, themes: list[dict], short: list[dict], long: list[d
     warn = [t for t in themes if t["kind"] == "warn"][:2]
     if hot:
         p.append("【資金去向】" + ";".join(
-            f"{t['theme']}({t['verdict']},5日跑贏恒指 {t['rs5'] * 100:+.1f}%,成交 {t['turn_ratio']:.1f} 倍)" for t in hot) + "。")
+            f"{t['theme']}({t['verdict']},5日跑贏{index_name} {t['rs5'] * 100:+.1f}%,成交 {t['turn_ratio']:.1f} 倍)" for t in hot) + "。")
     if warn:
         p.append("【提防】" + "、".join(t["theme"] for t in warn) + " 新聞多但資金未跟,追入風險高。")
     if short:
@@ -105,24 +106,24 @@ def fallback_text(reg: dict, themes: list[dict], short: list[dict], long: list[d
     return "\n".join(p)
 
 
-def run(use_news: bool = True, use_ai: bool = True, save: bool = True) -> dict:
+def run(m: Market, use_news: bool = True, use_ai: bool = True, save: bool = True) -> dict:
     now = data.now_hkt()
-    session = data.market_session(now)
-    print(f"[{now:%Y-%m-%d %H:%M} HKT] {session} - loading prices")
-    prices, g = data.load()
-    names, themes_of = universe.stock_names(), universe.stock_theme()
+    session = data.market_session(m, now)
+    print(f"[{now:%Y-%m-%d %H:%M} HKT] {m.name} {session} - loading prices")
+    prices, g = data.load(m)
+    names, themes_of = m.names(), m.theme_of()
     cols = [c for c in prices.close.columns if c in names]
     f = indicators.features(prices)
     asof = prices.close.index[-1].strftime("%Y-%m-%d")
 
-    print("  regime + southbound")
-    sb = flows.southbound_history()
-    x = regime.inputs(prices, f, g, sb, cols)
-    comp = regime.components(x)
-    rscore = regime.score(comp)
+    print("  regime + flows")
+    sb = flows.southbound_history() if m.key == "hk" else pd.Series(dtype=float)
+    x = regime.inputs(prices, f, g, sb, cols, m)
+    comp = regime.components(x, m)
+    rscore = regime.score(comp, m)
     # live row: use the freshest global/southbound numbers, not the "as known before that day's open" version
     live_x = x.iloc[-1].copy()
-    if not g.empty:
+    if m.key == "hk" and not g.empty:
         for col in ("^GSPC", "^IXIC"):
             if col in g:
                 live_x[col] = g[col].dropna().pct_change().iloc[-1]
@@ -134,18 +135,19 @@ def run(use_news: bool = True, use_ai: bool = True, save: bool = True) -> dict:
                 live_x["cnh5"] = s.iloc[-1] / s.iloc[-6] - 1
     if len(sb):
         live_x["sb5"] = sb.iloc[-5:].sum()
-    live_comp = regime.components(pd.DataFrame([live_x])).iloc[0]
-    live_score = float(regime.score(pd.DataFrame([live_comp])).iloc[0])
-    reg = regime.explain(live_x, live_comp, live_score)
+    live_comp = regime.components(pd.DataFrame([live_x]), m).iloc[0]
+    live_score = float(regime.score(pd.DataFrame([live_comp]), m).iloc[0])
+    reg = regime.explain(live_x, live_comp, live_score, m)
 
     print("  scores")
     short = scoring.short_score(f, cols)
     long = scoring.long_score(f, cols)
 
     print("  news")
-    items = news.fetch() if use_news else []
-    nstats = news.theme_stats(items, now.strftime("%Y-%m-%d"), save=save) if use_news else {}
-    tf = flows.theme_flows(f, prices)
+    items = news.fetch(m) if use_news else []
+    today = data.local_now(m).strftime("%Y-%m-%d")
+    nstats = news.theme_stats(items, today, m, save=save) if use_news else {}
+    tf = flows.theme_flows(f, prices, m)
     themes = theme_table(tf, nstats)
     heat = {t["theme"]: t["heat"] for t in themes}
 
@@ -154,6 +156,8 @@ def run(use_news: bool = True, use_ai: bool = True, save: bool = True) -> dict:
     close = prices.close.iloc[-1]
     atr = f["atr_pct"].iloc[-1]
 
+    L = levels.frames(prices, f)
+
     def pick(t, sc, kind):
         c = float(close[t])
         a = float(atr[t]) if not pd.isna(atr[t]) else 0.03
@@ -161,9 +165,9 @@ def run(use_news: bool = True, use_ai: bool = True, save: bool = True) -> dict:
                "ret1": f["ret1"][t].iloc[-1], "ret5": f["ret5"][t].iloc[-1], "ret20": f["ret20"][t].iloc[-1],
                "rsi": f["rsi14"][t].iloc[-1], "turn_ratio": f["turn_ratio"][t].iloc[-1],
                "spark": [round(float(v), 3) for v in prices.close[t].iloc[-60:].ffill().tolist()]}
+        row["plan"] = levels.plan_for(L, t, m.key)
         if kind == "short":
-            row.update(short_score=float(last[t]), theme_heat=heat.get(themes_of[t]),
-                       stop=round(c * (1 - 2 * a), 3), target=round(c * (1 + 3 * a), 3), atr_pct=a,
+            row.update(short_score=float(last[t]), theme_heat=heat.get(themes_of[t]), atr_pct=a,
                        reasons=scoring.short_reasons(f, t))
         else:
             row.update(mom_12_1=f["mom_12_1"][t].iloc[-1], vol60=f["vol60"][t].iloc[-1],
@@ -178,31 +182,47 @@ def run(use_news: bool = True, use_ai: bool = True, save: bool = True) -> dict:
         p["fund"] = fund.get(p["ticker"])
 
     print("  backtest")
-    bt = backtest.run(prices, short, long, rscore)
-    if session == "收市後" and save:
-        tracking.record(asof, reg, [p["ticker"] for p in short_picks], [p["ticker"] for p in long_picks])
-    live = tracking.evaluate(prices, cols)
+    bt = backtest.run(prices, short, long, rscore, m.index, m.cost, m.index_name)
+    bt["plan"] = levels.test_short_plan(prices, short, L)
 
-    hsi = prices.close["^HSI"].iloc[-250:]
+    # every stock, for the holdings check on the page
+    lsc = long.iloc[-1]
+    stocks = {}
+    for t in cols:
+        v = lambda k: f[k][t].iloc[-1]
+        stocks[t] = {"name": names[t], "theme": themes_of[t], "close": float(close[t]),
+                     "ret1": v("ret1"), "ret5": v("ret5"), "ret20": v("ret20"), "rsi": v("rsi14"),
+                     "short_score": last.get(t), "long_score": lsc.get(t),
+                     "above_ma20": v("ma20") and close[t] > v("ma20"), "above_ma50": v("ma50") and close[t] > v("ma50"),
+                     "above_ma200": None if pd.isna(v("ma200")) else bool(close[t] > v("ma200")),
+                     "ma20": levels.tick_round(v("ma20"), m.key), "ma50": levels.tick_round(v("ma50"), m.key),
+                     "ma200": levels.tick_round(v("ma200"), m.key), "drawdown": v("drawdown"),
+                     "plan": levels.plan_for(L, t, m.key)}
+    if session == "收市後" and save:
+        tracking.record(asof, reg, [p["ticker"] for p in short_picks], [p["ticker"] for p in long_picks], m.suffix)
+    live = tracking.evaluate(prices, cols, m.index, m.suffix)
+
+    ix = prices.close[m.index].iloc[-250:]
     market = {
-        "hsi": [[d.strftime("%Y-%m-%d"), round(float(v), 1)] for d, v in hsi.items()],
-        "hsi_ma50": [None if pd.isna(v) else round(float(v), 1)
-                     for v in prices.close["^HSI"].rolling(50).mean().iloc[-250:]],
+        "key": m.key, "name": m.name, "index_name": m.index_name,
+        "index": [[d.strftime("%Y-%m-%d"), round(float(v), 1)] for d, v in ix.items()],
+        "index_ma50": [None if pd.isna(v) else round(float(v), 1)
+                       for v in prices.close[m.index].rolling(50).mean().iloc[-250:]],
         "indices": {k: {"name": n, "close": prices.close[k].iloc[-1],
                         "ret1": f["ret1"][k].iloc[-1], "ret5": f["ret5"][k].iloc[-1]}
-                    for k, n in universe.BENCHMARKS.items() if k in prices.close},
+                    for k, n in m.benchmarks.items() if k in prices.close},
         "global": {k: {"name": n, "close": g[k].dropna().iloc[-1],
                        "ret1": g[k].dropna().pct_change().iloc[-1],
                        "date": g[k].dropna().index[-1].strftime("%m-%d")}
-                   for k, n in universe.GLOBAL.items() if not g.empty and k in g and g[k].notna().any()},
+                   for k, n in m.context.items() if not g.empty and k in g and g[k].notna().any()},
     }
-    sb_out = {"history": [[d.strftime("%Y-%m-%d"), round(float(v), 1)] for d, v in sb.iloc[-30:].items()],
+    sb_out = None if m.key != "hk" else {"history": [[d.strftime("%Y-%m-%d"), round(float(v), 1)] for d, v in sb.iloc[-30:].items()],
               "top": flows.southbound_top(), "sum5": _num(sb.iloc[-5:].sum(), 1) if len(sb) else None,
               "sum20": _num(sb.iloc[-20:].sum(), 1) if len(sb) else None}
 
     out = {"updated": now.strftime("%Y-%m-%d %H:%M"), "session": session, "asof": asof,
            "regime": reg, "market": market, "themes": themes, "southbound": sb_out,
-           "short": short_picks, "long": long_picks,
+           "short": short_picks, "long": long_picks, "stocks": stocks,
            "news": [{k: v for k, v in it.items() if k != "ts"} for it in items[:60]],
            "backtest": bt, "live": live,
            "weights": {"short": scoring.SHORT_WEIGHTS, "long": scoring.LONG_WEIGHTS, "regime": regime.WEIGHTS}}
@@ -211,16 +231,17 @@ def run(use_news: bool = True, use_ai: bool = True, save: bool = True) -> dict:
     ai = None
     if use_ai:
         print("  agent")
-        payload = {"regime": reg, "themes": themes[:8], "southbound": {"sum5": sb_out["sum5"], "top": sb_out["top"][:6]},
-                   "short": [{k: p[k] for k in ("ticker", "name", "theme", "score", "close", "stop", "reasons")} for p in short_picks[:6]],
+        payload = {"market": m.name, "regime": reg, "themes": themes[:8],
+                   "southbound": {"sum5": sb_out["sum5"], "top": sb_out["top"][:6]} if sb_out else None,
+                   "short": [{k: p[k] for k in ("ticker", "name", "theme", "score", "close", "plan", "reasons")} for p in short_picks[:6]],
                    "long": [{k: p[k] for k in ("ticker", "name", "theme", "score", "reasons", "fund")} for p in long_picks[:6]],
                    "headlines": [it["title"] for it in items[:25]], "backtest": bt, "session": session}
-        ai = agent.analyse(_clean(payload))
+        ai = agent.analyse(_clean(payload), m.name, m.suffix)
     out["analysis"] = {"text": ai["text"], "by": "Claude"} if ai else \
-        {"text": fallback_text(reg, themes, short_picks, long_picks), "by": "系統規則"}
+        {"text": fallback_text(reg, themes, short_picks, long_picks, m.index_name), "by": "系統規則"}
 
     if save:
         data.DOCS.mkdir(parents=True, exist_ok=True)
-        (data.DOCS / "data.json").write_text(json.dumps(out, ensure_ascii=False, allow_nan=False), encoding="utf-8")
-        print(f"  wrote {data.DOCS / 'data.json'}")
+        (data.DOCS / m.out).write_text(json.dumps(out, ensure_ascii=False, allow_nan=False), encoding="utf-8")
+        print(f"  wrote {data.DOCS / m.out}")
     return out

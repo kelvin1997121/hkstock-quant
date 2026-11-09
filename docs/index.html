@@ -72,6 +72,16 @@ svg text{fill:var(--muted);font-size:11px}
 .idx b{display:block;font-size:15px}
 .pass{color:var(--up);font-weight:600}.fail{color:var(--down);font-weight:600}
 footer{color:var(--muted);font-size:12px;padding:10px 0 30px}
+.tabs{display:flex;gap:6px;margin:4px 0 14px}
+.tabs button{flex:1;max-width:160px;padding:9px 0;border-radius:10px;border:1px solid var(--border);background:var(--card);color:var(--ink);font:inherit;font-weight:600;cursor:pointer}
+.tabs button[aria-selected="true"]{background:var(--s1);border-color:var(--s1);color:#fff}
+.plan{margin-top:6px;font-size:13px;border-top:1px dashed var(--grid);padding-top:6px;display:grid;grid-template-columns:auto 1fr;gap:2px 10px}
+.plan b{font-weight:600;color:var(--ink)}
+.plan span:nth-child(odd){color:var(--muted)}
+textarea{width:100%;min-height:96px;font:14px/1.5 ui-monospace,Consolas,monospace;background:var(--surface);color:var(--ink);border:1px solid var(--border);border-radius:8px;padding:8px}
+.hsum{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0}
+.hsum div{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:13px}
+.hsum b{display:block;font-size:16px}
 button.tbtn{background:var(--chip);color:var(--ink);border:1px solid var(--border);border-radius:8px;padding:4px 10px;cursor:pointer;font:inherit;font-size:13px}
 </style>
 </head>
@@ -81,6 +91,12 @@ button.tbtn{background:var(--chip);color:var(--ink);border:1px solid var(--borde
     <div><h1>港股AI分析</h1><div class="sub" id="upd">載入中…</div></div>
     <button class="tbtn" id="theme">深色/淺色</button>
   </header>
+  <div class="tabs" role="tablist">
+    <button role="tab" data-m="hk" aria-selected="true">港股</button>
+    <button role="tab" data-m="us" aria-selected="false">美股</button>
+    <button role="tab" data-m="hold" aria-selected="false">我的持倉</button>
+  </div>
+  <div id="mainview">
 
   <div class="card">
     <div class="hero">
@@ -102,17 +118,17 @@ button.tbtn{background:var(--chip);color:var(--ink);border:1px solid var(--borde
   <div class="card">
     <h2>大市</h2>
     <div class="idx" id="idx"></div>
-    <div class="legend" style="margin-top:10px"><span><i style="background:var(--s1)"></i>恒指</span><span><i style="background:var(--s2)"></i>50天線</span></div>
+    <div class="legend" style="margin-top:10px"><span><i style="background:var(--s1)"></i><span id="idxname">指數</span></span><span><i style="background:var(--s2)"></i>50天線</span></div>
     <div id="hsichart"></div>
   </div>
 
   <div class="card">
     <h2>資金去向 · 邊個板塊最值得熱炒</h2>
-    <div class="sub">熱度 = 5日跑贏恒指 30% + 成交放大 25% + 資金流 20% + 新聞熱度 25%。「共振」= 新聞熱而且資金真係流入。</div>
+    <div class="sub">熱度 = 5日跑贏<span class="ixn">大市</span> 30% + 成交放大 25% + 資金流 20% + 新聞熱度 25%。「共振」= 新聞熱而且資金真係流入。</div>
     <div class="scroll"><table id="themes"></table></div>
   </div>
 
-  <div class="grid2">
+  <div class="grid2" id="sbwrap">
     <div class="card">
       <h2>南向資金(港股通)</h2>
       <div class="sub" id="sbsum"></div>
@@ -126,12 +142,13 @@ button.tbtn{background:var(--chip);color:var(--ink);border:1px solid var(--borde
 
   <div class="card">
     <h2>短炒候選(1-2星期)</h2>
-    <div class="sub">止蝕 = 收市價減 2 倍 ATR;目標 = 加 3 倍 ATR。只係參考位,唔係買賣建議。</div>
+    <div class="sub">買入區 = 現價至下方支持位(20天線 / 10日低位);止蝕 = 買入區底再減 1 個 ATR(每日平均波幅);目標 = 上方阻力位。RSI 過熱會將買入區調低,唔追高。價位按交易所價位表執位。只係按固定規則計出嚟嘅參考位,唔係預測,亦唔係買賣建議。</div>
     <div class="picks" id="short" style="margin-top:10px"></div>
   </div>
 
   <div class="card">
     <h2>長揸候選(3-12個月)</h2>
+    <div class="sub" style="margin-bottom:10px">收集區 = 50天線附近至200天線上方,分段買;長線止蝕 = 200天線下 3% 或收集區底減 1.5 個 ATR。</div>
     <div class="picks" id="long"></div>
   </div>
 
@@ -146,8 +163,20 @@ button.tbtn{background:var(--chip);color:var(--ink);border:1px solid var(--borde
     <div class="scroll" style="margin-top:8px"><table id="bt"></table></div>
     <div id="live" style="margin-top:12px"></div>
   </div>
+  </div>
 
-  <footer>數據:Yahoo Finance(延遲約15分鐘)、東方財富(南向資金)、RTHK / 經濟通 / Google News。
+  <div id="holdview" hidden>
+    <div class="card">
+      <h2>我的持倉</h2>
+      <div class="sub">每行一隻:代號 股數 成本價。港股寫數字(例如 700 或 0700),美股寫代號(例如 AAPL)。
+        <b>持倉只會儲存喺你部機嘅瀏覽器,唔會上傳去任何地方</b>;手機同電腦要各自輸入。</div>
+      <textarea id="hin" placeholder="700 200 480&#10;9988 500 95.5&#10;AAPL 10 190"></textarea>
+      <div style="display:flex;gap:8px;margin-top:8px"><button class="tbtn" id="hsave">分析</button><button class="tbtn" id="hclear">清除</button></div>
+      <div id="hout"></div>
+    </div>
+  </div>
+
+  <footer>數據:Yahoo Finance(港股延遲約15分鐘)、東方財富(南向資金)、RTHK / 經濟通 / Google News。
   本頁只係數據分析工具,唔係投資建議;過往表現唔代表將來,投資有風險,自己決定自己負責。</footer>
 </div>
 <div id="tip"></div>
@@ -170,7 +199,7 @@ $("theme").onclick = () => {
   document.documentElement.dataset.theme = nxt; try { localStorage.setItem("theme", nxt); } catch(e){}
 };
 
-function lineChart(el, dates, s1, s2){
+function lineChart(el, dates, s1, s2, name){
   const W = el.clientWidth || 600, H = 220, L = 46, R = 8, T = 8, B = 22;
   const vals = s1.concat(s2.filter(v => v!=null));
   let lo = Math.min(...vals), hi = Math.max(...vals); const pad = (hi-lo)*0.06; lo -= pad; hi += pad;
@@ -179,7 +208,7 @@ function lineChart(el, dates, s1, s2){
   let g = "";
   for (let k=0;k<=4;k++){ const v = lo + (hi-lo)*k/4; g += `<line x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}" stroke="var(--grid)"/><text x="${L-6}" y="${y(v)+4}" text-anchor="end">${Math.round(v).toLocaleString()}</text>`; }
   for (let k=0;k<dates.length;k+=Math.ceil(dates.length/5)) g += `<text x="${x(k)}" y="${H-6}" text-anchor="middle">${dates[k].slice(2,7)}</text>`;
-  el.innerHTML = `<svg width="${W}" height="${H}" role="img" aria-label="恒指走勢及50天線">${g}
+  el.innerHTML = `<svg width="${W}" height="${H}" role="img" aria-label="${name}走勢及50天線">${g}
     <path d="${path(s2)}" fill="none" stroke="var(--s2)" stroke-width="2"/>
     <path d="${path(s1)}" fill="none" stroke="var(--s1)" stroke-width="2"/>
     <line id="xh" y1="${T}" y2="${H-B}" stroke="var(--axis)" style="display:none"/>
@@ -188,7 +217,7 @@ function lineChart(el, dates, s1, s2){
   const svg = el.querySelector("svg"), xh = svg.querySelector("#xh"), xd = svg.querySelector("#xd");
   svg.onmousemove = e => { const r = svg.getBoundingClientRect(); const i = Math.max(0, Math.min(dates.length-1, Math.round((e.clientX-r.left-L)/(W-L-R)*(dates.length-1))));
     xh.setAttribute("x1", x(i)); xh.setAttribute("x2", x(i)); xh.style.display=""; xd.setAttribute("cx", x(i)); xd.setAttribute("cy", y(s1[i])); xd.style.display="";
-    showTip(e, `<b>${dates[i]}</b><br>恒指 ${num(s1[i],0)}<br>50天線 ${num(s2[i],0)}`); };
+    showTip(e, `<b>${dates[i]}</b><br>${name} ${num(s1[i],0)}<br>50天線 ${num(s2[i],0)}`); };
   svg.onmouseleave = () => { xh.style.display="none"; xd.style.display="none"; hideTip(); };
 }
 
@@ -211,20 +240,39 @@ function spark(vals){
   return `<svg width="${W}" height="${H}" aria-label="60日走勢"><path d="${p}" fill="none" stroke="var(--s1)" stroke-width="1.5"/></svg>`;
 }
 
+const px = v => v==null ? "–" : num(v, v < 1 ? 3 : 2);
+
+function planBlock(p, kind){
+  const pl = p.plan || {};
+  if (kind === "short") { const s = pl.short || {};
+    const far = s.t1_pct != null && s.rr != null && s.rr > 4 ? `<span></span><span class="wrn">目標1離現價遠(+${s.t1_pct}%),1-2星期內未必到</span>` : "";
+    return `<div class="plan"><span>買入區</span><b>${px(s.entry_low)} – ${px(s.entry_high)}</b>
+      <span>止蝕</span><b class="neg">${px(s.stop)}(${s.stop_pct}%)</b>
+      <span>目標</span><b class="pos">${px(s.t1)}(+${s.t1_pct}%) / ${px(s.t2)}</b>
+      <span>回報風險比</span><b>${s.rr ?? "–"} : 1</b>${far}</div>`; }
+  const l = pl.long || {};
+  return `<div class="plan"><span>收集區</span><b>${px(l.zone_low)} – ${px(l.zone_high)}</b>
+    <span>長線止蝕</span><b class="neg">${px(l.stop)}</b><span>目標</span><b class="pos">${px(l.target)}</b></div>`;
+}
+
 function pickCard(p, kind){
   const f = p.fund || {};
   const fund = [f.pe!=null?`PE ${f.pe}`:"", f.yield?`息率 ${f.yield}%`:"", f.pb!=null?`PB ${f.pb}`:""].filter(Boolean).join(" · ");
-  const lv = kind==="short" ? `收 ${num(p.close,2)} · 止蝕 <span class="neg">${num(p.stop,2)}</span> · 目標 <span class="pos">${num(p.target,2)}</span>`
-                            : `收 ${num(p.close,2)} · 一年動力 ${pct(p.mom_12_1,0)} · 波幅 ${(p.vol60*100).toFixed(0)}%`;
+  const lv = kind==="short" ? `收 ${px(p.close)} · RSI ${Math.round(p.rsi)}`
+                            : `收 ${px(p.close)} · 一年動力 ${pct(p.mom_12_1,0)} · 波幅 ${(p.vol60*100).toFixed(0)}%`;
   return `<div class="pick"><div class="top"><span><span class="nm">${esc(p.name)}</span> <span class="sub">${esc(p.ticker)}</span></span><span class="badge">${Math.round(p.score)}分</span></div>
     <div style="display:flex;justify-content:space-between;align-items:center"><span class="tag">${esc(p.theme)}</span>${spark(p.spark)}</div>
     <div class="lv">${lv}</div>
     <div class="lv">今日 <span class="${cls(p.ret1)}">${pct(p.ret1)}</span> · 5日 <span class="${cls(p.ret5)}">${pct(p.ret5)}</span> · 20日 <span class="${cls(p.ret20)}">${pct(p.ret20)}</span>${fund?"<br>"+fund:""}</div>
+    ${planBlock(p, kind)}
     <ul>${(p.reasons||[]).map(r => `<li>${esc(r)}</li>`).join("")}</ul></div>`;
 }
 
 function render(d){
-  $("upd").textContent = `更新:${d.updated} HKT(${d.session},數據截至 ${d.asof})`;
+  const ixn = d.market.index_name;
+  $("upd").textContent = `${d.market.name} · 更新:${d.updated} 香港時間(${d.session},數據截至 ${d.asof})`;
+  $("idxname").textContent = ixn;
+  document.querySelectorAll(".ixn").forEach(e => e.textContent = ixn);
   const r = d.regime;
   $("rlabel").textContent = r.label;
   $("rscore").textContent = (r.score>0?"+":"") + Math.round(r.score);
@@ -242,37 +290,124 @@ function render(d){
   const ix = Object.values(d.market.indices).map(v => `<div>${esc(v.name)}<b>${num(v.close,0)}</b><span class="${cls(v.ret1)}">${pct(v.ret1)}</span></div>`);
   const gl = Object.values(d.market.global).map(v => `<div>${esc(v.name)} <span class="sub">${v.date}</span><b>${num(v.close,2)}</b><span class="${cls(v.ret1)}">${pct(v.ret1)}</span></div>`);
   $("idx").innerHTML = ix.concat(gl).join("");
-  lineChart($("hsichart"), d.market.hsi.map(x => x[0]), d.market.hsi.map(x => x[1]), d.market.hsi_ma50);
+  lineChart($("hsichart"), d.market.index.map(x => x[0]), d.market.index.map(x => x[1]), d.market.index_ma50, ixn);
 
   const hmax = Math.max(...d.themes.map(t => t.heat));
-  $("themes").innerHTML = `<tr><th>板塊</th><th class="h">熱度</th><th>今日</th><th>5日跑贏恒指</th><th>成交倍數</th><th>資金流</th><th>新聞(今日/平均)</th><th class="l">判斷</th></tr>` +
+  $("themes").innerHTML = `<tr><th>板塊</th><th class="h">熱度</th><th>今日</th><th>5日跑贏${esc(ixn)}</th><th>成交倍數</th><th>資金流</th><th>新聞(今日/平均)</th><th class="l">判斷</th></tr>` +
     d.themes.map(t => `<tr><td>${esc(t.theme)}</td><td class="h"><span class="heat" style="width:${(t.heat/hmax*60).toFixed(0)}px"></span>${Math.round(t.heat)}</td>
       <td class="${cls(t.ret1)}">${pct(t.ret1)}</td><td class="${cls(t.rs5)}">${pct(t.rs5)}</td><td>${num(t.turn_ratio,1)}x</td>
       <td class="${cls(t.cmf5)}">${num(t.cmf5,2)}</td><td>${t.news_count} / ${num(t.news_baseline,1)}</td><td class="l k-${t.kind}">${esc(t.verdict)}</td></tr>`).join("");
 
   const sb = d.southbound;
-  $("sbsum").innerHTML = sb.sum5==null ? "南向數據暫時取唔到" : `近5日淨${sb.sum5>=0?"買":"賣"} <b class="${cls(sb.sum5)}">${Math.abs(sb.sum5).toFixed(0)} 億</b> · 近20日 <b class="${cls(sb.sum20)}">${sb.sum20.toFixed(0)} 億</b>`;
-  if (sb.history.length) flowBars($("sbchart"), sb.history);
-  $("sbtop").innerHTML = `<tr><th>股票</th><th>淨買(億)</th><th>今日</th><th class="l">板塊</th></tr>` +
-    sb.top.slice(0,10).map(x => `<tr><td>${esc(x.name)} <span class="sub">${esc(x.ticker)}</span></td><td class="${cls(x.net)}">${num(x.net,2)}</td><td class="${cls(x.chg)}">${x.chg==null?"–":(x.chg>0?"+":"")+x.chg.toFixed(1)+"%"}</td><td class="l">${esc(x.theme||"")}</td></tr>`).join("");
+  $("sbwrap").hidden = !sb;
+  if (sb) {
+    $("sbsum").innerHTML = sb.sum5==null ? "南向數據暫時取唔到" : `近5日淨${sb.sum5>=0?"買":"賣"} <b class="${cls(sb.sum5)}">${Math.abs(sb.sum5).toFixed(0)} 億</b> · 近20日 <b class="${cls(sb.sum20)}">${sb.sum20.toFixed(0)} 億</b>`;
+    if (sb.history.length) flowBars($("sbchart"), sb.history);
+    $("sbtop").innerHTML = `<tr><th>股票</th><th>淨買(億)</th><th>今日</th><th class="l">板塊</th></tr>` +
+      sb.top.slice(0,10).map(x => `<tr><td>${esc(x.name)} <span class="sub">${esc(x.ticker)}</span></td><td class="${cls(x.net)}">${num(x.net,2)}</td><td class="${cls(x.chg)}">${x.chg==null?"–":(x.chg>0?"+":"")+x.chg.toFixed(1)+"%"}</td><td class="l">${esc(x.theme||"")}</td></tr>`).join("");
+  }
 
   $("short").innerHTML = d.short.map(p => pickCard(p, "short")).join("");
   $("long").innerHTML = d.long.map(p => pickCard(p, "long")).join("");
   $("news").innerHTML = d.news.slice(0,40).map(n => `<li><span class="sub">${esc(n.time)} ${esc(n.source)}</span> <a href="${esc(n.link)}" target="_blank" rel="noopener">${esc(n.title)}</a> ${n.themes.map(t => `<span class="tag">${esc(t)}</span>`).join("")}</li>`).join("");
 
-  const b = d.backtest, row = (name, x, metric) => x ? `<tr><td>${name}</td><td>${x.start} 至 ${x.end}</td><td>${x.n}</td><td>${metric}</td><td>${x.t}</td><td class="${x.pass?"pass":"fail"}">${x.pass?"合格":"未證實有效"}</td><td class="l sub">${esc(x.rule)}</td></tr>` : "";
+  const b = d.backtest, row = (name, x, metric) => x ? `<tr><td>${name}</td><td>${x.start ? x.start+" 至 "+x.end : "近五年"}</td><td>${x.n}</td><td>${metric}</td><td>${x.t}</td><td class="${x.pass?"pass":"fail"}">${x.pass?"合格":"未證實有效"}</td><td class="l sub">${esc(x.rule)}</td></tr>` : "";
   $("bt").innerHTML = `<tr><th>測試</th><th>期間</th><th>樣本</th><th>結果</th><th>t值</th><th>結論</th><th class="l">合格標準</th></tr>` +
     row("短炒分數", b.short, b.short ? `頭10隻每5日跑贏平均 ${b.short.top_excess}%(扣成本 ${b.short.top_excess_net}%),勝率 ${b.short.hit}%` : "") +
+    row("買賣位", b.plan, b.plan ? `先到目標1 ${b.plan.target_first}% · 先到止蝕 ${b.plan.stop_first}% · 10日都未到 ${b.plan.neither}% · 平均 ${b.plan.mean_r}R` : "") +
     row("長揸分數", b.long, b.long ? `頭10隻每60日跑贏平均 ${b.long.top_excess}%,勝率 ${b.long.hit}%` : "") +
-    row("型勢判斷", b.regime, b.regime ? `偏好/強勢後5日恒指平均 ${b.regime.bull_ret}%,偏淡/弱勢後 ${b.regime.bear_ret}%(全部平均 ${b.regime.all_ret}%)` : "");
+    row("型勢判斷", b.regime, b.regime ? `偏好/強勢後5日${esc(ixn)}平均 ${b.regime.bull_ret}%,偏淡/弱勢後 ${b.regime.bear_ret}%(全部平均 ${b.regime.all_ret}%)` : "");
   const lv = d.live;
   $("live").innerHTML = lv.n ? `<div class="sub">實戰紀錄(每日收市後記低,5日後計分):${lv.n} 日已計分</div>
       <div class="note">短炒頭10隻平均跑贏股票池 <b class="${cls(lv.short_excess)}">${lv.short_excess}%</b>(勝率 ${lv.short_hit}%)· 型勢方向啱 ${lv.regime_hit}%</div>`
     : `<div class="note">實戰紀錄:已記低 ${lv.pending} 日嘅判斷,5個交易日後開始計分。呢個先係最真實嘅準確度。</div>`;
 }
 
-fetch("data.json?t=" + Date.now()).then(r => r.json()).then(render).catch(e => { $("upd").textContent = "載入數據失敗:" + e; });
-let rt; addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(() => fetch("data.json").then(r => r.json()).then(render), 200); });
+// ---------------------------------------------------------------- holdings (kept in this browser only)
+const USDHKD = 7.8;
+function normTicker(t){
+  t = t.trim().toUpperCase().replace(/\.HK$/, "");
+  if (/^\d{1,5}$/.test(t)) { const n = String(parseInt(t, 10)); return (n.length < 4 ? n.padStart(4, "0") : n) + ".HK"; }
+  return t.replace(/\./g, "-");
+}
+function parseHoldings(text){
+  return text.split(/\n/).map(l => l.trim()).filter(l => l && !l.startsWith("#")).map(l => {
+    const [t, q, c] = l.split(/[\s,]+/); return {ticker: normTicker(t || ""), qty: parseFloat(q), cost: parseFloat(c), raw: l};
+  });
+}
+function holdingNotes(s, h){
+  const n = [], lp = s.plan.long, sp = s.plan.short;
+  if (lp.stop && s.close < lp.stop) n.push(["neg", `已跌穿長線止蝕參考位 ${px(lp.stop)}`]);
+  if (s.above_ma200 === false) n.push(["neg", "企喺200天線之下,長線趨勢向下"]);
+  if (s.above_ma200 && s.above_ma50 && s.above_ma20) n.push(["pos", "企穩20/50/200天線,趨勢健康"]);
+  else if (s.above_ma200 && !s.above_ma50) n.push(["wrn", "跌穿50天線,中期轉弱,留意200天線支持"]);
+  if (s.rsi > 75) n.push(["wrn", `RSI ${Math.round(s.rsi)},短線過熱`]);
+  if (s.plan.resistance && s.close >= s.plan.resistance * 0.98) n.push(["wrn", `接近20日高位阻力 ${px(s.plan.resistance)}`]);
+  if (h.pl > 0.3) n.push(["wrn", `已賺 ${(h.pl*100).toFixed(0)}%,短線止蝕參考 ${px(sp.stop)} 可用嚟保住利潤`]);
+  if (h.pl < -0.2) n.push(["neg", `已蝕 ${(-h.pl*100).toFixed(0)}%,值得重新檢查當初買入理由`]);
+  return n;
+}
+function renderHoldings(){
+  const text = $("hin").value; try { localStorage.setItem("holdings", text); } catch(e){}
+  const rows = parseHoldings(text);
+  if (!rows.length) { $("hout").innerHTML = ""; return; }
+  const all = {...(DATA.hk?.stocks||{}), ...(DATA.us?.stocks||{})};
+  let tot = 0, totCost = 0, below200 = 0, known = 0; const themeVal = {};
+  const out = rows.map(h => {
+    const s = all[h.ticker], us = !h.ticker.endsWith(".HK"), fx = us ? USDHKD : 1;
+    if (!s || !isFinite(h.qty) || !isFinite(h.cost) || h.cost <= 0) return {h, s: null};
+    const val = s.close * h.qty * fx, cost = h.cost * h.qty * fx; h.pl = s.close / h.cost - 1;
+    tot += val; totCost += cost; known++; themeVal[s.theme] = (themeVal[s.theme]||0) + val;
+    if (s.above_ma200 === false) below200 += val;
+    return {h, s, val, cost, us};
+  });
+  const ok = out.filter(o => o.s);
+  const risks = [];
+  if (ok.length) {
+    const big = ok.slice().sort((a,b) => b.val - a.val)[0];
+    const topTheme = Object.entries(themeVal).sort((a,b) => b[1]-a[1])[0];
+    if (big.val/tot > 0.3) risks.push(`最大持倉 ${esc(big.s.name)} 佔 ${(big.val/tot*100).toFixed(0)}%,單一股票風險集中`);
+    if (topTheme[1]/tot > 0.5) risks.push(`${esc(topTheme[0])} 板塊佔 ${(topTheme[1]/tot*100).toFixed(0)}%,板塊風險集中`);
+    if (below200/tot > 0.3) risks.push(`${(below200/tot*100).toFixed(0)}% 資金放喺長線趨勢向下(200天線下)嘅股票`);
+    ["hk","us"].forEach(k => { const d = DATA[k];
+      if (d && ok.some(o => o.us === (k === "us")) && d.regime.score <= -15) risks.push(`${d.market.name}大市型勢「${d.regime.label}」,整體倉位風險較高`); });
+  }
+  const pl = totCost ? tot / totCost - 1 : null;
+  $("hout").innerHTML = `<div class="hsum"><div>總市值(港元)<b>${num(tot,0)}</b></div><div>總盈虧(港元)<b class="${cls(pl)}">${num(tot-totCost,0)}(${pct(pl)})</b></div>
+      <div>已分析<b>${known} / ${rows.length} 隻</b></div></div>
+    ${risks.map(r => `<div class="note">${r}</div>`).join("")}
+    <div class="scroll" style="margin-top:10px"><table><tr><th>股票</th><th>現價</th><th>成本</th><th>盈虧</th><th>佔比</th><th>短炒分</th><th>長揸分</th><th>支持 / 阻力</th><th>止蝕參考(短 / 長)</th><th class="l">數據提示</th></tr>` +
+    out.map(o => { if (!o.s) return `<tr><td>${esc(o.h.raw)}</td><td colspan="9" class="l sub">未有數據:唔喺股票池,或者格式唔啱(代號 股數 成本)。</td></tr>`;
+      const s = o.s, h = o.h;
+      return `<tr><td>${esc(s.name)} <span class="sub">${esc(h.ticker)}</span></td><td>${px(s.close)} <span class="${cls(s.ret1)}">${pct(s.ret1)}</span></td><td>${px(h.cost)}</td>
+        <td class="${cls(h.pl)}">${pct(h.pl)}</td><td>${(o.val/tot*100).toFixed(0)}%</td><td>${s.short_score==null?"–":Math.round(s.short_score)}</td><td>${s.long_score==null?"–":Math.round(s.long_score)}</td>
+        <td>${px(s.plan.support)} / ${px(s.plan.resistance)}</td><td>${px(s.plan.short.stop)} / ${px(s.plan.long.stop)}</td>
+        <td class="l">${holdingNotes(s, h).map(([c,t]) => `<div class="${c}">${esc(t)}</div>`).join("") || "–"}</td></tr>`; }).join("") + `</table></div>
+    <div class="sub" style="margin-top:8px">分數 0-100 = 喺股票池入面排第幾(100 最強)。美股按 1 美元 = 7.8 港元計。以上只係數據整理,唔係買賣建議。</div>`;
+}
+
+// ---------------------------------------------------------------- tabs + loading
+const DATA = {};
+let view = "hk";
+try { view = location.hash.slice(1) || localStorage.getItem("view") || "hk"; } catch(e){}
+if (!["hk","us","hold"].includes(view)) view = "hk";
+function show(v){
+  view = v; try { localStorage.setItem("view", v); history.replaceState(null, "", "#" + v); } catch(e){}
+  document.querySelectorAll(".tabs button").forEach(b => b.setAttribute("aria-selected", String(b.dataset.m === v)));
+  $("mainview").hidden = v === "hold"; $("holdview").hidden = v !== "hold";
+  if (v === "hold") { $("upd").textContent = "持倉分析(用港股同美股最新數據)"; renderHoldings(); }
+  else if (DATA[v]) render(DATA[v]);
+  else $("upd").textContent = "載入中…";
+}
+document.querySelectorAll(".tabs button").forEach(b => b.onclick = () => show(b.dataset.m));
+$("hsave").onclick = renderHoldings;
+$("hclear").onclick = () => { $("hin").value = ""; renderHoldings(); };
+try { $("hin").value = localStorage.getItem("holdings") || ""; } catch(e){}
+const load = (k, f) => fetch(f + "?t=" + Date.now()).then(r => r.json()).then(d => { DATA[k] = d; if (view === k || view === "hold") show(view); })
+  .catch(e => { if (view === k) $("upd").textContent = "載入數據失敗:" + e; });
+load("hk", "data.json"); load("us", "us.json");
+show(view);
+let rt; addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(() => show(view), 200); });
 </script>
 </body>
 </html>

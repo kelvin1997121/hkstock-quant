@@ -11,10 +11,11 @@ import time
 from dataclasses import dataclass
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 
-from . import universe
+from .universe import Market
 
 HKT = timezone(timedelta(hours=8))
 ROOT = Path(__file__).resolve().parent.parent
@@ -67,37 +68,47 @@ def _split(df: pd.DataFrame, tickers: list[str]) -> Prices:
     return p
 
 
-def load(period: str = "5y") -> tuple[Prices, pd.DataFrame]:
-    """Returns (HK prices incl. benchmarks, global closes)."""
-    hk = list(universe.stock_names()) + list(universe.BENCHMARKS)
-    hk_prices = _split(_download(hk, period), hk)
-    # drop non-trading days (rows where the HSI itself has no print)
-    rows = hk_prices.close["^HSI"].notna()
-    hk_prices = Prices(*(getattr(hk_prices, f)[rows] for f in ("close", "high", "low", "volume")))
-    gl = list(universe.GLOBAL)
+def load(m: Market, period: str = "5y") -> tuple[Prices, pd.DataFrame]:
+    """Returns (stock + benchmark prices, context closes)."""
+    tickers = list(m.names()) + list(m.benchmarks)
+    prices = _split(_download(tickers, period), tickers)
+    # drop non-trading days (rows where the main index has no print)
+    rows = prices.close[m.index].notna()
+    prices = Prices(*(getattr(prices, f)[rows] for f in ("close", "high", "low", "volume")))
     try:
-        g = _download(gl, "2y")["Close"]
+        g = _download(list(m.context), period)["Close"]
         g.index = pd.to_datetime(g.index).tz_localize(None)
     except Exception as e:
-        print(f"  global data failed: {e}")
+        print(f"  context data failed: {e}")
         g = pd.DataFrame()
-    return hk_prices, g
+    return prices, g
 
 
 def now_hkt() -> datetime:
     return datetime.now(HKT)
 
 
-def market_session(ts: datetime | None = None) -> str:
-    ts = ts or now_hkt()
+def local_now(m: Market) -> datetime:
+    return datetime.now(ZoneInfo(m.tz))
+
+
+def market_session(m: Market, ts: datetime | None = None) -> str:
+    ts = (ts or now_hkt()).astimezone(ZoneInfo(m.tz))
     if ts.weekday() >= 5:
         return "休市"
     hm = ts.hour * 100 + ts.minute
     if hm < 930:
         return "開市前"
-    if hm < 1600 + 15:  # Yahoo lags ~15 min; treat until 16:15 as still forming
+    lag = 15 if m.key == "hk" else 5  # Yahoo delay before the closing print settles
+    if hm < 1600 + lag:
         return "盤中"
     return "收市後"
+
+
+def is_active(m: Market, ts: datetime | None = None) -> bool:
+    """Weekday, between 08:00 and 18:30 exchange time: worth a scheduled run."""
+    ts = (ts or now_hkt()).astimezone(ZoneInfo(m.tz))
+    return ts.weekday() < 5 and 800 <= ts.hour * 100 + ts.minute <= 1830
 
 
 def env_flag(name: str) -> bool:

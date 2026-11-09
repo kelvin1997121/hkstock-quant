@@ -17,22 +17,33 @@ from .data import DATA, HKT
 
 UA = {"User-Agent": "Mozilla/5.0 (hkstock-quant)"}
 
-FEEDS = {
-    "RTHK財經": "https://rthk.hk/rthk/news/rss/c_expressnews_cfinance.xml",
-    "經濟通": "https://www.etnet.com.hk/www/tc/news/rss.php?section=editor",
-}
-GOOGLE_QUERIES = ["港股", "恒指", "南向資金", "港股 板塊", "美股 收市", "中國 經濟 政策"]
 
 POS = ["急升", "飆", "飙", "創新高", "创新高", "利好", "增持", "回購", "回购", "上調", "上调", "超預期", "超预期",
        "買入", "买入", "突破", "反彈", "反弹", "獲批", "获批", "大增", "勁升", "劲升", "升", "漲", "涨"]
 NEG = ["急跌", "暴跌", "新低", "利淡", "減持", "减持", "下調", "下调", "遜預期", "逊预期", "警告", "虧損", "亏损",
        "制裁", "調查", "调查", "插水", "跌", "挫", "瀉", "泻", "沽"]
+POS_EN = ["surge", "surges", "soar", "soars", "rally", "rallies", "jump", "jumps", "beat", "beats", "record high",
+          "upgrade", "upgraded", "gain", "gains", "rise", "rises", "climb", "climbs"]
+NEG_EN = ["plunge", "plunges", "slump", "slumps", "fall", "falls", "drop", "drops", "miss", "misses", "downgrade",
+          "downgraded", "probe", "lawsuit", "tumble", "tumbles", "sink", "sinks", "selloff", "sell-off", "slide"]
 
-HISTORY = DATA / "news_history.json"
 
 
-def _google(q: str) -> str:
-    return f"https://news.google.com/rss/search?q={quote(q + ' when:1d')}&hl=zh-HK&gl=HK&ceid=HK:zh-Hant"
+def _google(q: str, lang: str) -> str:
+    loc = "hl=zh-HK&gl=HK&ceid=HK:zh-Hant" if lang == "zh" else "hl=en-US&gl=US&ceid=US:en"
+    return f"https://news.google.com/rss/search?q={quote(q + ' when:1d')}&{loc}"
+
+
+def _matcher(kw: str):
+    """English keywords match whole words in any case; Chinese ones as plain substrings."""
+    if kw.isascii():
+        rx = re.compile(r"(?<![A-Za-z0-9])" + re.escape(kw) + r"(?![A-Za-z0-9])", re.I)
+        return lambda t: bool(rx.search(t))
+    return lambda t: kw in t
+
+
+def tag_themes(title: str, keywords: dict) -> list[str]:
+    return [th for th, kws in keywords.items() if any(_matcher(k)(title) for k in kws)]
 
 
 def _published(e) -> datetime | None:
@@ -40,9 +51,9 @@ def _published(e) -> datetime | None:
     return datetime(*t[:6], tzinfo=timezone.utc) if t else None
 
 
-def fetch(hours: int = 30) -> list[dict]:
-    srcs = dict(FEEDS)
-    srcs.update({f"Google:{q}": _google(q) for q in GOOGLE_QUERIES})
+def fetch(m: universe.Market, hours: int = 30) -> list[dict]:
+    srcs = dict(m.feeds)
+    srcs.update({f"Google:{q}": _google(q, lang) for q, lang in m.google})
     cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
     seen, items = set(), []
     for src, url in srcs.items():
@@ -64,7 +75,7 @@ def fetch(hours: int = 30) -> list[dict]:
                           "time": pub.astimezone(HKT).strftime("%m-%d %H:%M") if pub else "",
                           "ts": pub.timestamp() if pub else 0})
     for it in items:
-        it["themes"] = [th for th, kws in universe.THEME_KEYWORDS.items() if any(k in it["title"] for k in kws)]
+        it["themes"] = tag_themes(it["title"], m.keywords)
         it["tone"] = tone(it["title"])
     items.sort(key=lambda x: -x["ts"])
     return items
@@ -72,17 +83,19 @@ def fetch(hours: int = 30) -> list[dict]:
 
 def tone(title: str) -> int:
     """+1 / -1 / 0 from simple keyword counts. Crude, so only used in aggregate."""
-    p = sum(title.count(w) for w in POS)
-    n = sum(title.count(w) for w in NEG)
+    low = title.lower()
+    p = sum(title.count(w) for w in POS) + sum(bool(re.search(rf"{re.escape(w)}", low)) for w in POS_EN)
+    n = sum(title.count(w) for w in NEG) + sum(bool(re.search(rf"{re.escape(w)}", low)) for w in NEG_EN)
     return (p > n) - (n > p)
 
 
-def theme_stats(items: list[dict], today: str, save: bool = True) -> dict[str, dict]:
+def theme_stats(items: list[dict], today: str, m: universe.Market, save: bool = True) -> dict[str, dict]:
+    HISTORY = DATA / f"news_history{m.suffix}.json"
     hist = {}
     if HISTORY.exists():
         hist = json.loads(HISTORY.read_text(encoding="utf-8"))
-    counts = {th: 0 for th in universe.THEMES}
-    tones = {th: 0 for th in universe.THEMES}
+    counts = {th: 0 for th in m.themes}
+    tones = {th: 0 for th in m.themes}
     for it in items:
         for th in it["themes"]:
             counts[th] += 1

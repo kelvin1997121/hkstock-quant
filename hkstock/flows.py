@@ -62,18 +62,18 @@ def southbound_top() -> list[dict]:
     for x in rows:
         x["net"] = round(x["net"], 2)
         x["deal"] = round(x["deal"], 2)
-        x["theme"] = universe.stock_theme().get(x["ticker"])
+        x["theme"] = universe.HK.theme_of().get(x["ticker"])
     return rows
 
 
-def theme_flows(f: dict[str, pd.DataFrame], prices, i: int = -1) -> pd.DataFrame:
+def theme_flows(f: dict[str, pd.DataFrame], prices, m: universe.Market, i: int = -1) -> pd.DataFrame:
     """Per-theme snapshot on row i: turnover-weighted returns, turnover surge, money flow, breadth."""
     t = prices.turnover
-    hsi = prices.close["^HSI"]
+    hsi = prices.close[m.index]
     hsi5 = hsi.iloc[i] / hsi.iloc[i - 5] - 1
     hsi20 = hsi.iloc[i] / hsi.iloc[i - 20] - 1
     rows = []
-    for theme, group in universe.THEMES.items():
+    for theme, group in m.themes.items():
         cols = [c for c in group if c in prices.close.columns]
         if not cols:
             continue

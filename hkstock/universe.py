@@ -66,13 +66,117 @@ GLOBAL = {
 }
 
 
-def stock_names() -> dict[str, str]:
-    return {t: n for group in THEMES.values() for t, n in group.items()}
 
 
-def stock_theme() -> dict[str, str]:
-    return {t: theme for theme, group in THEMES.items() for t in group}
+# ---------------------------------------------------------------- US market
+US_THEMES: dict[str, dict[str, str]] = {
+    "AI晶片": {"NVDA": "輝達", "AMD": "AMD", "AVGO": "博通", "TSM": "台積電", "ARM": "Arm",
+             "MRVL": "Marvell", "QCOM": "高通", "INTC": "英特爾", "MU": "美光"},
+    "半導體設備": {"ASML": "ASML", "AMAT": "應用材料", "LRCX": "科林研發", "KLAC": "KLA"},
+    "大型科技": {"AAPL": "蘋果", "MSFT": "微軟", "GOOGL": "Alphabet", "AMZN": "亞馬遜", "META": "Meta",
+              "NFLX": "Netflix"},
+    "AI軟件及雲": {"PLTR": "Palantir", "ORCL": "甲骨文", "CRM": "Salesforce", "NOW": "ServiceNow",
+               "SNOW": "Snowflake", "CRWD": "CrowdStrike", "PANW": "Palo Alto"},
+    "電動車及自動駕駛": {"TSLA": "特斯拉", "RIVN": "Rivian", "UBER": "Uber"},
+    "加密及金融科技": {"COIN": "Coinbase", "MSTR": "Strategy", "HOOD": "Robinhood", "PYPL": "PayPal", "XYZ": "Block"},
+    "中概股": {"BABA": "阿里巴巴", "PDD": "拼多多", "JD": "京東", "BIDU": "百度", "NIO": "蔚來", "TME": "騰訊音樂"},
+    "銀行金融": {"JPM": "摩根大通", "BAC": "美國銀行", "GS": "高盛", "MS": "摩根士丹利", "WFC": "富國銀行",
+              "V": "Visa", "MA": "Mastercard", "BRK-B": "巴郡"},
+    "醫藥": {"LLY": "禮來", "NVO": "諾和諾德", "UNH": "聯合健康", "JNJ": "強生", "MRK": "默沙東",
+           "ABBV": "艾伯維", "PFE": "輝瑞"},
+    "能源": {"XOM": "埃克森美孚", "CVX": "雪佛龍", "OXY": "西方石油", "COP": "康菲石油", "SLB": "斯倫貝謝"},
+    "核電及電力": {"VST": "Vistra", "CEG": "Constellation", "OKLO": "Oklo", "SMR": "NuScale",
+              "GEV": "GE Vernova", "NEE": "NextEra"},
+    "量子計算": {"IONQ": "IonQ", "RGTI": "Rigetti", "QBTS": "D-Wave"},
+    "消費零售": {"WMT": "沃爾瑪", "COST": "Costco", "MCD": "麥當勞", "NKE": "Nike", "SBUX": "星巴克",
+              "HD": "家得寶"},
+    "國防航天": {"LMT": "洛克希德", "RTX": "RTX", "NOC": "諾斯洛普", "RKLB": "Rocket Lab"},
+    "黃金礦業": {"NEM": "紐蒙特", "AEM": "Agnico Eagle", "B": "巴里克", "WPM": "Wheaton"},
+}
+
+# English keywords match as whole words, any case; Chinese ones as substrings.
+US_THEME_KEYWORDS: dict[str, list[str]] = {
+    "AI晶片": ["輝達", "黃仁勳", "黄仁勋", "英偉達", "英伟达", "Nvidia", "AMD", "博通", "Broadcom", "台積電", "台积电", "TSMC", "晶片",
+             "芯片", "GPU", "Marvell", "高通", "Qualcomm", "英特爾", "英特尔", "Intel", "美光", "Micron", "HBM", "chip", "chips"],
+    "半導體設備": ["ASML", "應用材料", "Applied Materials", "Lam Research", "KLA", "光刻", "半導體設備", "chipmaking equipment"],
+    "大型科技": ["蘋果", "苹果", "Apple", "iPhone", "微軟", "微软", "Microsoft", "谷歌", "Google", "Alphabet", "亞馬遜",
+              "亚马逊", "Amazon", "Meta", "Netflix", "七巨頭", "七巨头", "Magnificent Seven", "Big Tech"],
+    "AI軟件及雲": ["Palantir", "甲骨文", "Oracle", "Salesforce", "ServiceNow", "Snowflake", "CrowdStrike", "雲端",
+               "云端", "cloud", "software", "軟件", "OpenAI", "ChatGPT", "AI agent", "人工智能", "AI"],
+    "電動車及自動駕駛": ["Tesla", "特斯拉", "馬斯克", "马斯克", "Musk", "Rivian", "Uber", "自動駕駛", "自动驾驶",
+                  "Robotaxi", "電動車", "电动车", "EV"],
+    "加密及金融科技": ["比特幣", "比特币", "Bitcoin", "加密", "crypto", "Coinbase", "MicroStrategy", "Robinhood",
+                "PayPal", "穩定幣", "稳定币", "stablecoin", "Ethereum", "以太坊"],
+    "中概股": ["中概", "阿里", "Alibaba", "拼多多", "PDD", "Temu", "京東", "京东", "百度", "Baidu", "蔚來", "蔚来",
+            "ADR", "China stocks", "Chinese stocks"],
+    "銀行金融": ["摩根大通", "JPMorgan", "美銀", "美银", "Bank of America", "高盛", "Goldman", "摩根士丹利",
+              "Morgan Stanley", "富國", "Wells Fargo", "Visa", "Mastercard", "巴菲特", "Buffett", "Berkshire",
+              "銀行", "银行", "banks"],
+    "醫藥": ["禮來", "礼来", "Eli Lilly", "Lilly", "諾和諾德", "诺和诺德", "Novo Nordisk", "減肥藥", "减肥药", "GLP-1",
+           "Wegovy", "Ozempic", "UnitedHealth", "聯合健康", "輝瑞", "辉瑞", "Pfizer", "默沙東", "Merck", "FDA", "drugmaker"],
+    "能源": ["油價", "油价", "原油", "oil", "OPEC", "埃克森", "Exxon", "雪佛龍", "Chevron", "天然氣", "天然气", "crude"],
+    "核電及電力": ["核電", "核电", "nuclear", "Vistra", "Constellation", "Oklo", "NuScale", "電力", "电力", "power grid",
+              "GE Vernova", "電網", "电网", "utilities", "electricity"],
+    "量子計算": ["量子", "quantum", "IonQ", "Rigetti", "D-Wave"],
+    "消費零售": ["沃爾瑪", "沃尔玛", "Walmart", "Costco", "麥當勞", "麦当劳", "McDonald's", "Nike", "星巴克",
+              "Starbucks", "Home Depot", "零售", "retail", "consumer", "消費", "消费"],
+    "國防航天": ["國防", "国防", "defense", "Lockheed", "Raytheon", "RTX", "Northrop", "Rocket Lab", "SpaceX", "太空", "軍工", "军工"],
+    "黃金礦業": ["黃金", "黄金", "金價", "金价", "gold", "Newmont", "Barrick", "白銀", "白银", "silver"],
+}
+
+US_BENCHMARKS = {"^GSPC": "標普500", "^IXIC": "納斯達克", "^DJI": "道瓊斯", "^RUT": "羅素2000"}
+
+US_GLOBAL = {
+    "^VIX": "VIX恐慌指數", "^TNX": "美國10年債息", "DX-Y.NYB": "美匯指數", "HYG": "高息債ETF", "LQD": "投資級債ETF",
+    "GC=F": "金價", "CL=F": "紐約期油", "BTC-USD": "比特幣", "^HSI": "恒生指數",
+}
 
 
-def all_tickers() -> list[str]:
-    return list(stock_names()) + list(BENCHMARKS) + list(GLOBAL)
+# ---------------------------------------------------------------- market settings
+from dataclasses import dataclass, field
+
+
+@dataclass(frozen=True)
+class Market:
+    key: str
+    name: str
+    themes: dict
+    keywords: dict
+    benchmarks: dict
+    context: dict
+    index: str            # main index ticker
+    index_name: str
+    tech: str             # tech gauge compared with the index (risk appetite)
+    tech_name: str
+    tz: str
+    cost: float           # round-trip trading cost used in the backtest
+    feeds: dict = field(default_factory=dict)
+    google: tuple = ()    # (query, language) pairs for Google News RSS
+    out: str = "data.json"
+    suffix: str = ""
+
+    def names(self) -> dict[str, str]:
+        return {t: n for group in self.themes.values() for t, n in group.items()}
+
+    def theme_of(self) -> dict[str, str]:
+        return {t: th for th, group in self.themes.items() for t in group}
+
+
+HK = Market(
+    key="hk", name="港股", themes=THEMES, keywords=THEME_KEYWORDS, benchmarks=BENCHMARKS, context=GLOBAL,
+    index="^HSI", index_name="恒指", tech="3033.HK", tech_name="恒生科技", tz="Asia/Hong_Kong", cost=0.003,
+    feeds={"RTHK財經": "https://rthk.hk/rthk/news/rss/c_expressnews_cfinance.xml",
+           "經濟通": "https://www.etnet.com.hk/www/tc/news/rss.php?section=editor"},
+    google=(("港股", "zh"), ("恒指", "zh"), ("南向資金", "zh"), ("港股 板塊", "zh"), ("美股 收市", "zh")),
+    out="data.json", suffix="",
+)
+
+US = Market(
+    key="us", name="美股", themes=US_THEMES, keywords=US_THEME_KEYWORDS, benchmarks=US_BENCHMARKS, context=US_GLOBAL,
+    index="^GSPC", index_name="標普500", tech="^IXIC", tech_name="納指", tz="America/New_York", cost=0.001,
+    google=(("美股", "zh"), ("華爾街 股市", "zh"), ("聯儲局 減息", "zh"), ("納指 科技股", "zh"),
+            ("stock market today", "en"), ("Wall Street stocks", "en"), ("stocks rally OR selloff", "en")),
+    out="us.json", suffix="_us",
+)
+
+MARKETS = {"hk": HK, "us": US}

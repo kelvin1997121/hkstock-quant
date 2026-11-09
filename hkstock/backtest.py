@@ -4,10 +4,11 @@ Pass rules, written 2026-11-09 BEFORE the first run and not to be changed after
 seeing results:
   * Short score: every 5th trading day (non-overlapping), Spearman IC between the
     score and the next 5-day return. PASS if mean IC t-stat >= 2.0 AND the top 10
-    beat the universe average AFTER 0.3% round-trip cost.
+    beat the universe average AFTER round-trip cost (HK 0.3%; US 0.1%, set
+    2026-11-09 before the first US run).
   * Long score: every 20th day, next 60-day return; t-stat divided by sqrt(3) for the
     overlap. PASS if adjusted t >= 2.0 AND top 10 beat the universe average.
-  * Regime: every 5th day, correlation of score with the next 5-day HSI return.
+  * Regime: every 5th day, correlation of score with the next 5-day index return.
     PASS if t-stat >= 2.0.
 
 Known biases, stated on the page: the universe is today's names (survivorship bias
@@ -19,7 +20,6 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-COST = 0.003  # HK round trip: stamp duty 0.1% x 2 + fees, rounded up
 
 
 def _ic_test(score: pd.DataFrame, fwd: pd.DataFrame, step: int, overlap: float = 1.0, top: int = 10):
@@ -44,7 +44,8 @@ def _ic_test(score: pd.DataFrame, fwd: pd.DataFrame, step: int, overlap: float =
             "start": str(dates[0].date()), "end": str(dates[-1].date())}
 
 
-def run(prices, short: pd.DataFrame, long: pd.DataFrame, regime_score: pd.Series) -> dict:
+def run(prices, short: pd.DataFrame, long: pd.DataFrame, regime_score: pd.Series, index: str = "^HSI",
+        cost: float = 0.003, index_name: str = "恒指") -> dict:
     c = prices.close[short.columns]
     fwd5 = c.shift(-5) / c - 1
     fwd60 = c.shift(-60) / c - 1
@@ -52,9 +53,9 @@ def run(prices, short: pd.DataFrame, long: pd.DataFrame, regime_score: pd.Series
 
     r = _ic_test(short, fwd5, step=5)
     if r:
-        r["top_excess_net"] = round(r["top_excess"] - COST * 100, 2)
+        r["top_excess_net"] = round(r["top_excess"] - cost * 100, 2)
         r["pass"] = bool(r["t"] >= 2.0 and r["top_excess_net"] > 0)
-        r["rule"] = "每5日揀分數最高10隻,持5日;IC t值 ≥ 2 及扣0.3%成本後跑贏平均先算合格"
+        r["rule"] = f"每5日揀分數最高10隻,持5日;IC t值 ≥ 2 及扣{cost * 100:.1f}%成本後跑贏平均先算合格"
     out["short"] = r
 
     r = _ic_test(long, fwd60, step=20, overlap=3)
@@ -63,7 +64,7 @@ def run(prices, short: pd.DataFrame, long: pd.DataFrame, regime_score: pd.Series
         r["rule"] = "每20日揀分數最高10隻,持60日;重疊調整後 t ≥ 2 及跑贏平均先算合格"
     out["long"] = r
 
-    hsi = prices.close["^HSI"]
+    hsi = prices.close[index]
     f5 = (hsi.shift(-5) / hsi - 1)
     df = pd.DataFrame({"s": regime_score, "r": f5}).dropna().iloc[::5]
     if len(df) > 30:
@@ -77,5 +78,5 @@ def run(prices, short: pd.DataFrame, long: pd.DataFrame, regime_score: pd.Series
                          "all_ret": round(float(df["r"].mean() * 100), 2),
                          "start": str(df.index[0].date()), "end": str(df.index[-1].date()),
                          "pass": bool(t >= 2.0),
-                         "rule": "型勢分數同之後5日恒指回報嘅相關;t ≥ 2 先算合格"}
+                         "rule": f"型勢分數同之後5日{index_name}回報嘅相關;t ≥ 2 先算合格"}
     return out

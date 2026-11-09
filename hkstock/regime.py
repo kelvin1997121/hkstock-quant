@@ -1,8 +1,9 @@
 ﻿"""Today's market condition (當日型勢): weighs evidence for and against, then reaches a verdict.
 
 Each piece of evidence gives a value in [-1, +1]; the verdict is the weighted
-average x 100. The weights were set by hand (2026-11-09) and are not fitted.
-Missing evidence (e.g. southbound data down) is left out and the rest re-weighted.
+average x 100. The weights were set by hand (HK 2026-11-09, US 2026-11-09) and
+are not fitted. Missing evidence (e.g. southbound data down) is left out and the
+rest re-weighted.
 
 The "thinking" part: besides the verdict, it lists the strongest evidence
 AGAINST the verdict and flags contradictions (index up on narrow breadth, etc.),
@@ -13,8 +14,14 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-WEIGHTS = {"trend": 20, "breadth": 15, "momentum": 10, "volatility": 10,
-           "us": 15, "vix": 10, "cnh": 10, "southbound": 10}
+from .universe import Market
+
+WEIGHTS = {
+    "hk": {"trend": 20, "breadth": 15, "momentum": 10, "volatility": 10,
+           "us": 15, "vix": 10, "cnh": 10, "southbound": 10},
+    "us": {"trend": 20, "breadth": 15, "momentum": 10, "volatility": 10,
+           "vix": 15, "rates": 10, "dollar": 5, "credit": 15},
+}
 
 LABELS = [(40, "強勢", "進攻:主攻強勢板塊突破股,可以順勢短炒"),
           (15, "偏好", "偏積極:揀資金流入嘅板塊,回調吸納,注意止蝕"),
@@ -27,32 +34,44 @@ def _clip(x):
     return np.clip(x, -1, 1)
 
 
-def _global_aligned(g: pd.DataFrame, idx: pd.DatetimeIndex) -> pd.DataFrame:
-    """Global data as known before HK opens on each HK date (previous calendar day's close)."""
+def _context(g: pd.DataFrame, idx: pd.DatetimeIndex, m: Market) -> pd.DataFrame:
+    """Context series as known on each trading date.
+
+    HK: US/global data from the previous calendar day (known before HK opens).
+    US: same-day closes (same trading session)."""
     if g.empty:
         return pd.DataFrame(index=idx)
     out = pd.DataFrame(index=g.index)
-    for col in ("^GSPC", "^IXIC"):
-        if col in g:
-            out[col] = g[col].pct_change(fill_method=None)
     if "^VIX" in g:
         out["vix"] = g["^VIX"]
-    if "CNY=X" in g:
-        out["cnh5"] = g["CNY=X"].ffill().pct_change(5, fill_method=None)
-    out.index = out.index + pd.Timedelta(days=1)
+    if m.key == "hk":
+        for col in ("^GSPC", "^IXIC"):
+            if col in g:
+                out[col] = g[col].pct_change(fill_method=None)
+        if "CNY=X" in g:
+            out["cnh5"] = g["CNY=X"].ffill().pct_change(5, fill_method=None)
+        out.index = out.index + pd.Timedelta(days=1)
+    else:
+        if "^TNX" in g:
+            out["tnx"] = g["^TNX"].ffill()
+            out["tnx5"] = g["^TNX"].ffill().diff(5)
+        if "DX-Y.NYB" in g:
+            out["dxy5"] = g["DX-Y.NYB"].ffill().pct_change(5, fill_method=None)
+        if "HYG" in g and "LQD" in g:
+            out["credit20"] = (g["HYG"] / g["LQD"]).ffill().pct_change(20, fill_method=None)
     return out.reindex(idx, method="ffill")
 
 
-def inputs(prices, f: dict, g: pd.DataFrame, sb: pd.Series, stock_cols: list[str]) -> pd.DataFrame:
+def inputs(prices, f: dict, g: pd.DataFrame, sb: pd.Series, stock_cols: list[str], m: Market) -> pd.DataFrame:
     c = prices.close
-    hsi = c["^HSI"]
+    idx = c[m.index]
     x = pd.DataFrame(index=c.index)
-    x["hsi"] = hsi
-    x["ma20"] = hsi.rolling(20).mean()
-    x["ma50"] = hsi.rolling(50).mean()
-    x["ma200"] = hsi.rolling(200).mean()
-    x["ret5"] = hsi.pct_change(5, fill_method=None)
-    vol20 = hsi.pct_change(fill_method=None).rolling(20).std() * np.sqrt(252)
+    x["idx"] = idx
+    x["ma20"] = idx.rolling(20).mean()
+    x["ma50"] = idx.rolling(50).mean()
+    x["ma200"] = idx.rolling(200).mean()
+    x["ret5"] = idx.pct_change(5, fill_method=None)
+    vol20 = idx.pct_change(fill_method=None).rolling(20).std() * np.sqrt(252)
     x["vol20"] = vol20
     x["vol_pct"] = vol20.rolling(250, min_periods=120).rank(pct=True)
     above = (c[stock_cols] > f["ma20"][stock_cols]).where(f["ma20"][stock_cols].notna())
@@ -61,9 +80,9 @@ def inputs(prices, f: dict, g: pd.DataFrame, sb: pd.Series, stock_cols: list[str
     x["breadth50"] = above50.mean(axis=1)
     t = prices.turnover[stock_cols].sum(axis=1)
     x["mkt_turn_ratio"] = t / t.shift(1).rolling(20).mean()
-    if "3033.HK" in c:
-        x["tech_rs5"] = c["3033.HK"].pct_change(5, fill_method=None) - x["ret5"]
-    ga = _global_aligned(g, c.index)
+    if m.tech in c:
+        x["tech_rs5"] = c[m.tech].pct_change(5, fill_method=None) - x["ret5"]
+    ga = _context(g, c.index, m)
     for col in ga:
         x[col] = ga[col]
     if len(sb):
@@ -73,30 +92,39 @@ def inputs(prices, f: dict, g: pd.DataFrame, sb: pd.Series, stock_cols: list[str
     return x
 
 
-def components(x: pd.DataFrame) -> pd.DataFrame:
+def components(x: pd.DataFrame, m: Market) -> pd.DataFrame:
     s = pd.DataFrame(index=x.index)
-    s["trend"] = (0.4 * np.sign(x["hsi"] - x["ma20"]) + 0.3 * np.sign(x["ma20"] - x["ma50"])
-                  + 0.3 * np.sign(x["hsi"] - x["ma200"])).where(x["ma200"].notna())
+    s["trend"] = (0.4 * np.sign(x["idx"] - x["ma20"]) + 0.3 * np.sign(x["ma20"] - x["ma50"])
+                  + 0.3 * np.sign(x["idx"] - x["ma200"])).where(x["ma200"].notna())
     s["breadth"] = _clip((x["breadth20"] - 0.5) * 2.5)
     s["momentum"] = _clip(x["ret5"] / 0.03)
     s["volatility"] = (1 - 2 * x["vol_pct"])
-    if "^GSPC" in x and "^IXIC" in x:
-        s["us"] = _clip((x["^GSPC"] + x["^IXIC"]) / 2 / 0.015)
     if "vix" in x:
         s["vix"] = _clip((20 - x["vix"]) / 8)
-    if "cnh5" in x:
-        s["cnh"] = _clip(-x["cnh5"] / 0.01)
-    if "sb5" in x:
-        s["southbound"] = _clip(x["sb5"] / 200)
+    if m.key == "hk":
+        if "^GSPC" in x and "^IXIC" in x:
+            s["us"] = _clip((x["^GSPC"] + x["^IXIC"]) / 2 / 0.015)
+        if "cnh5" in x:
+            s["cnh"] = _clip(-x["cnh5"] / 0.01)
+        if "sb5" in x:
+            s["southbound"] = _clip(x["sb5"] / 200)
+    else:
+        if "tnx5" in x:
+            s["rates"] = _clip(-x["tnx5"] / 0.25)      # yields up 25bp in a week = headwind
+        if "dxy5" in x:
+            s["dollar"] = _clip(-x["dxy5"] / 0.01)     # strong dollar tightens conditions
+        if "credit20" in x:
+            s["credit"] = _clip(x["credit20"] / 0.01)  # junk beating quality = risk appetite
     return s
 
 
-def score(comp: pd.DataFrame) -> pd.Series:
-    w = pd.Series({k: v for k, v in WEIGHTS.items() if k in comp})
-    present = comp[w.index].notna()
-    num = (comp[w.index].fillna(0) * w).sum(axis=1)
-    den = (present * w).sum(axis=1)
-    out = num / den * 100
+def score(comp: pd.DataFrame, m: Market) -> pd.Series:
+    w = pd.Series({k: v for k, v in WEIGHTS[m.key].items() if k in comp}, dtype=float)
+    c = comp[w.index].astype(float)
+    present = c.notna()
+    num = (c.fillna(0) * w).sum(axis=1)
+    den = (present.astype(float) * w).sum(axis=1)
+    out = num / den.replace(0, np.nan) * 100
     return out.where(present["trend"] if "trend" in present else True)
 
 
@@ -107,22 +135,29 @@ def label(sc: float) -> tuple[str, str]:
     return LABELS[-1][1], LABELS[-1][2]
 
 
-def explain(x: pd.Series, comp: pd.Series, sc: float) -> dict:
+def explain(x: pd.Series, comp: pd.Series, sc: float, m: Market) -> dict:
     """Evidence in plain Cantonese, sorted by impact, plus counter-arguments and contradictions."""
     pct = lambda v: f"{v * 100:+.1f}%"
+    n = m.index_name
+    hi = lambda a, b: "高於" if x[a] > x[b] else "低於"
     text = {
-        "trend": f"恒指 {x['hsi']:,.0f},{'高於' if x['hsi'] > x['ma20'] else '低於'}20天線({x['ma20']:,.0f})、"
-                 f"{'高於' if x['hsi'] > x['ma50'] else '低於'}50天線、{'高於' if x['hsi'] > x['ma200'] else '低於'}200天線",
+        "trend": f"{n} {x['idx']:,.0f},{hi('idx', 'ma20')}20天線({x['ma20']:,.0f})、"
+                 f"{hi('idx', 'ma50')}50天線、{hi('idx', 'ma200')}200天線",
         "breadth": f"重點股中有 {x['breadth20'] * 100:.0f}% 企喺20天線上(50天線上:{x['breadth50'] * 100:.0f}%)",
-        "momentum": f"恒指5日 {pct(x['ret5'])}",
-        "volatility": f"恒指20日年化波幅 {x['vol20'] * 100:.0f}%,處於一年內第 {x['vol_pct'] * 100:.0f} 百分位",
+        "momentum": f"{n}5日 {pct(x['ret5'])}",
+        "volatility": f"{n}20日年化波幅 {x['vol20'] * 100:.0f}%,處於一年內第 {x['vol_pct'] * 100:.0f} 百分位",
         "us": f"隔晚美股:標普 {pct(x.get('^GSPC', np.nan))}、納指 {pct(x.get('^IXIC', np.nan))}",
         "vix": f"VIX {x.get('vix', np.nan):.1f}",
         "cnh": f"人民幣5日 {'轉強' if x.get('cnh5', 0) < 0 else '轉弱'}({pct(-x.get('cnh5', np.nan))})",
         "southbound": f"南向資金近5日淨{'買' if x.get('sb5', 0) >= 0 else '賣'} {abs(x.get('sb5', 0)):.0f} 億",
+        "rates": f"美國10年債息 {x.get('tnx', np.nan):.2f}%,5日{'升' if x.get('tnx5', 0) >= 0 else '跌'} "
+                 f"{abs(x.get('tnx5', 0)) * 100:.0f} 點子",
+        "dollar": f"美匯指數5日 {pct(x.get('dxy5', np.nan))}",
+        "credit": f"高息債對投資級債20日 {pct(x.get('credit20', np.nan))}"
+                  f"({'資金願意冒險' if x.get('credit20', 0) >= 0 else '信貸市場避險'})",
     }
     ev = []
-    for k, w in WEIGHTS.items():
+    for k, w in WEIGHTS[m.key].items():
         v = comp.get(k)
         if v is None or pd.isna(v):
             continue
@@ -142,9 +177,9 @@ def explain(x: pd.Series, comp: pd.Series, sc: float) -> dict:
         notes.append("成交萎縮:現時走勢欠缺資金確認,突破易失敗")
     if "tech_rs5" in x and not pd.isna(x["tech_rs5"]):
         if x["tech_rs5"] > 0.02:
-            notes.append("恒生科技跑贏恒指:市場風險胃納提升,資金偏向高 beta 科技股")
+            notes.append(f"{m.tech_name}跑贏{n}:市場風險胃納提升,資金偏向高 beta 科技股")
         elif x["tech_rs5"] < -0.02:
-            notes.append("恒生科技跑輸恒指:資金避險,偏向高息防守股")
+            notes.append(f"{m.tech_name}跑輸{n}:資金避險,偏向防守股")
     if x["vol_pct"] > 0.85:
         notes.append("波幅處於一年高位:注碼要細、止蝕位要闊,唔適合重倉")
 
