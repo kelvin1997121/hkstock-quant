@@ -206,6 +206,7 @@ button.tbtn{background:var(--chip);color:var(--ink);border:1px solid var(--borde
     <div class="sub">合格標準喺第一次回測之前定好,之後唔會為咗靚數而改。股票池係現時嘅股票(有倖存者偏差,回測會偏好睇)。</div>
     <div class="scroll" style="margin-top:8px"><table id="bt"></table></div>
     <div id="live" style="margin-top:12px"></div>
+    <div id="livecharts" style="margin-top:10px"></div>
   </div>
   </div>
 
@@ -462,6 +463,52 @@ function render(d){
   $("live").innerHTML = lv.n ? `<div class="sub">實戰紀錄(每日收市後記低,5日後計分):${lv.n} 日已計分</div>
       <div class="note">短炒頭10隻平均跑贏股票池 <b class="${cls(lv.short_excess)}">${lv.short_excess}%</b>(勝率 ${lv.short_hit}%)· 型勢方向啱 ${lv.regime_hit}%</div>`
     : `<div class="note">實戰紀錄:已記低 ${lv.pending} 日嘅判斷,5個交易日後開始計分。呢個先係最真實嘅準確度。</div>`;
+  renderLiveCharts(d);
+}
+
+// ---------------------------------------------------------------- live record chart
+// One bar per logged day: how much the picks beat (green) or trailed (red) the rest of the universe
+// over the next 5 trading days. The dot under each bar marks whether the market-direction call was right.
+function recordBars(el, pts){
+  const W = el.clientWidth || 600, H = 150, L = 40, R = 6, T = 8, B = 28;
+  const m = Math.max(...pts.map(p => Math.abs(p[1] ?? 0)), 0.5);
+  const bw = (W - L - R) / pts.length, y = v => T + (m - v) * (H - T - B) / (2 * m), y0 = y(0);
+  let g = `<line x1="${L}" x2="${W - R}" y1="${y0}" y2="${y0}" stroke="var(--axis)"/>
+    <text x="${L - 4}" y="${y(m) + 4}" text-anchor="end">+${m.toFixed(1)}%</text>
+    <text x="${L - 4}" y="${y(-m) + 4}" text-anchor="end">-${m.toFixed(1)}%</text>`;
+  pts.forEach((p, i) => {
+    const x = L + i * bw, v = p[1];
+    if (v != null) { const top = Math.min(y(v), y0), h = Math.max(Math.abs(y(v) - y0), 1);
+      g += `<rect data-i="${i}" x="${x + 1}" y="${top}" width="${Math.max(bw - 2, 1)}" height="${h}" rx="2" fill="${v >= 0 ? 'var(--upfill)' : 'var(--down)'}"/>`; }
+    if (p[3] != null) g += `<circle cx="${x + bw / 2}" cy="${H - B + 9}" r="${Math.min(4, bw / 2.5)}" fill="${p[3] ? 'var(--upfill)' : 'var(--down)'}"/>`;
+    g += `<rect data-i="${i}" x="${x}" y="0" width="${bw}" height="${H}" fill="transparent"/>`;
+  });
+  g += `<text x="${L}" y="${H - 2}">${pts[0][0].slice(5)}</text><text x="${W - R}" y="${H - 2}" text-anchor="end">${pts.at(-1)[0].slice(5)}</text>`;
+  el.innerHTML = `<svg width="${W}" height="${H}" role="img" aria-label="實戰紀錄">${g}</svg>`;
+  el.querySelectorAll("rect[data-i]").forEach(b => { b.onmousemove = e => showTip(e, pts[+b.dataset.i][2]); b.onmouseleave = hideTip; });
+}
+function renderLiveCharts(d){
+  const box = $("livecharts"); if (!box) return;
+  const sys = d.live?.series || [], cl = d.claude_live?.series || [];
+  const avg = a => a.length ? (a.reduce((x, y) => x + y, 0) / a.length) : null;
+  let html = "";
+  if (sys.length >= 3) {
+    const ex = sys.map(x => x.excess), hit = sys.filter(x => x.regime_ok).length / sys.length * 100;
+    html += `<div class="sub" style="margin-top:6px"><b>系統</b>:短炒頭10隻之後 5 日跑贏股票池(柱)· 大市方向啱唔啱(點)。平均 <b class="${cls(avg(ex) / 100)}">${avg(ex).toFixed(2)}%</b>,方向啱 ${hit.toFixed(0)}%(${sys.length} 日)</div><div id="chart_sys"></div>`;
+  }
+  if (cl.length >= 3) {
+    const ex = cl.map(x => x.excess).filter(v => v != null), hit = cl.filter(x => x.ok).length / cl.length * 100;
+    html += `<div class="sub" style="margin-top:6px"><b>Claude</b>:睇好股之後 5 日跑贏股票池(柱)· 大市判斷啱唔啱(點)。平均 <b class="${cls((avg(ex) ?? 0) / 100)}">${ex.length ? avg(ex).toFixed(2) + "%" : "–"}</b>,判斷啱 ${hit.toFixed(0)}%(${cl.length} 日)</div><div id="chart_claude"></div>`;
+  }
+  if (!html) {
+    html = `<div class="sub">實戰紀錄有 3 日或以上先會畫圖(系統已計分 ${sys.length} 日,Claude ${cl.length} 日)。每日判斷要等 5 個交易日先知結果。</div>`;
+  }
+  box.innerHTML = html;
+  if (sys.length >= 3) recordBars($("chart_sys"), sys.map(x => [x.date, x.excess,
+    `<b>${x.date}</b><br>頭10隻跑贏股票池 ${x.excess > 0 ? "+" : ""}${x.excess}%<br>大市方向 ${x.regime_ok ? "啱" : "唔啱"}`, x.regime_ok]));
+  if (cl.length >= 3) recordBars($("chart_claude"), cl.map(x => [x.date, x.excess,
+    `<b>${x.date}</b><br>判斷「${esc(x.call)}」,之後 5 日指數 ${x.index_ret > 0 ? "+" : ""}${x.index_ret}% → ${x.ok ? "啱" : "唔啱"}` +
+    (x.excess == null ? "" : `<br>睇好股跑贏股票池 ${x.excess > 0 ? "+" : ""}${x.excess}%`), x.ok]));
 }
 
 // ---------------------------------------------------------------- holdings (kept in this browser only)
