@@ -50,5 +50,5 @@ With 7 candidates x 2 markets, about 0.3 false development passes are expected b
 
 ## Result (appended 2026-11-09 after the development run; rules above unchanged)
 No candidate passed development in either market (best: HK F3 near_52w_high IC t 1.23,
-US F6 MACD t 0.28). Per rule 5 the locked period (2024-11-01 onward) was **not opened**, so it
+US F2 pullback_uptrend t 0.64). Per rule 5 the locked period (2024-11-01 onward) was **not opened**, so it
 is still unused for any new indicator. Full numbers: `research/results_2026-11-09.json`.
