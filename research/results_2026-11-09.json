@@ -1,0 +1,192 @@
+{
+ "dev": {
+  "hk": {
+   "rows": {
+    "F1": {
+     "n": 146,
+     "ic": -0.0,
+     "t": -0.02,
+     "top_excess": -0.12,
+     "hit": 47.3,
+     "start": "2021-11-09",
+     "end": "2024-10-30",
+     "top_excess_net": -0.42,
+     "pass": false
+    },
+    "F2": {
+     "n": 107,
+     "ic": 0.012,
+     "t": 0.52,
+     "top_excess": -0.25,
+     "hit": 50.5,
+     "start": "2021-11-09",
+     "end": "2024-10-30",
+     "top_excess_net": -0.55,
+     "pass": false
+    },
+    "F3": {
+     "n": 123,
+     "ic": 0.036,
+     "t": 1.23,
+     "top_excess": 0.02,
+     "hit": 60.2,
+     "start": "2021-11-09",
+     "end": "2024-10-30",
+     "top_excess_net": -0.28,
+     "pass": false
+    },
+    "F4": {
+     "n": 143,
+     "ic": 0.02,
+     "t": 0.91,
+     "top_excess": 0.51,
+     "hit": 53.1,
+     "start": "2021-11-09",
+     "end": "2024-10-30",
+     "top_excess_net": 0.21,
+     "pass": false
+    },
+    "F5": {
+     "n": 143,
+     "ic": 0.012,
+     "t": 0.81,
+     "top_excess": 0.55,
+     "hit": 53.1,
+     "start": "2021-11-09",
+     "end": "2024-10-30",
+     "top_excess_net": 0.25,
+     "pass": false
+    },
+    "F6": {
+     "n": 140,
+     "ic": 0.019,
+     "t": 1.06,
+     "top_excess": 0.2,
+     "hit": 57.9,
+     "start": "2021-11-09",
+     "end": "2024-10-30",
+     "top_excess_net": -0.1,
+     "pass": false
+    },
+    "F7": {
+     "n": 143,
+     "ic": -0.018,
+     "t": -0.99,
+     "top_excess": -0.05,
+     "hit": 46.9,
+     "start": "2021-11-09",
+     "end": "2024-10-30",
+     "top_excess_net": -0.35,
+     "pass": false
+    },
+    "REF": {
+     "n": 137,
+     "ic": 0.015,
+     "t": 0.77,
+     "top_excess": 0.1,
+     "hit": 54.7,
+     "start": "2021-11-09",
+     "end": "2024-10-30",
+     "top_excess_net": -0.2,
+     "pass": false
+    }
+   },
+   "passers": [],
+   "finalists": []
+  },
+  "us": {
+   "rows": {
+    "F1": {
+     "n": 149,
+     "ic": -0.011,
+     "t": -0.62,
+     "top_excess": 0.03,
+     "hit": 48.3,
+     "start": "2021-11-09",
+     "end": "2024-10-28",
+     "top_excess_net": -0.07,
+     "pass": false
+    },
+    "F2": {
+     "n": 110,
+     "ic": 0.012,
+     "t": 0.64,
+     "top_excess": 0.02,
+     "hit": 49.1,
+     "start": "2021-11-09",
+     "end": "2024-10-28",
+     "top_excess_net": -0.08,
+     "pass": false
+    },
+    "F3": {
+     "n": 126,
+     "ic": 0.015,
+     "t": 0.54,
+     "top_excess": -0.14,
+     "hit": 51.6,
+     "start": "2021-11-09",
+     "end": "2024-10-28",
+     "top_excess_net": -0.24,
+     "pass": false
+    },
+    "F4": {
+     "n": 146,
+     "ic": 0.013,
+     "t": 0.61,
+     "top_excess": 0.8,
+     "hit": 56.8,
+     "start": "2021-11-09",
+     "end": "2024-10-28",
+     "top_excess_net": 0.7,
+     "pass": false
+    },
+    "F5": {
+     "n": 146,
+     "ic": 0.007,
+     "t": 0.62,
+     "top_excess": 0.17,
+     "hit": 54.1,
+     "start": "2021-11-09",
+     "end": "2024-10-28",
+     "top_excess_net": 0.07,
+     "pass": false
+    },
+    "F6": {
+     "n": 143,
+     "ic": 0.005,
+     "t": 0.28,
+     "top_excess": 0.45,
+     "hit": 55.2,
+     "start": "2021-11-09",
+     "end": "2024-10-28",
+     "top_excess_net": 0.35,
+     "pass": false
+    },
+    "F7": {
+     "n": 146,
+     "ic": -0.012,
+     "t": -0.72,
+     "top_excess": -0.01,
+     "hit": 47.3,
+     "start": "2021-11-09",
+     "end": "2024-10-28",
+     "top_excess_net": -0.11,
+     "pass": false
+    },
+    "REF": {
+     "n": 140,
+     "ic": 0.002,
+     "t": 0.09,
+     "top_excess": 0.44,
+     "hit": 58.6,
+     "start": "2021-11-09",
+     "end": "2024-10-28",
+     "top_excess_net": 0.34,
+     "pass": false
+    }
+   },
+   "passers": [],
+   "finalists": []
+  }
+ }
+}
