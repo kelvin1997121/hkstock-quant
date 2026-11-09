@@ -89,6 +89,7 @@ textarea{width:100%;min-height:96px;font:14px/1.5 ui-monospace,Consolas,monospac
 .livebar{display:flex;gap:14px;flex-wrap:wrap;align-items:baseline;font-size:13px;color:var(--ink2);margin:-4px 0 12px}
 .livebar b{color:var(--ink);font-size:14px}
 .livedot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--upfill);margin-right:5px;vertical-align:middle}
+.stale{background:var(--warnfill);color:#0b0b0b;border-radius:10px;padding:9px 12px;margin-bottom:12px;font-size:14px;font-weight:600}
 .livepx{font-size:13px;margin-top:4px;font-weight:600}
 button.tbtn{background:var(--chip);color:var(--ink);border:1px solid var(--border);border-radius:8px;padding:4px 10px;cursor:pointer;font:inherit;font-size:13px}
 </style>
@@ -106,6 +107,7 @@ button.tbtn{background:var(--chip);color:var(--ink);border:1px solid var(--borde
   </div>
   <div class="livebar" id="livebar"></div>
   <div id="mainview">
+    <div class="stale" id="stale" role="status" hidden></div>
 
   <div class="card">
     <div class="hero">
@@ -345,7 +347,27 @@ function pickCard(p, kind){
     <ul>${(p.reasons||[]).map(r => `<li>${esc(r)}</li>`).join("")}</ul></div>`;
 }
 
+// stale-data warning: during the market's session, analysis older than 45 minutes is flagged
+function tzNow(tz){
+  const p = Object.fromEntries(new Intl.DateTimeFormat("en-GB", {timeZone: tz, weekday: "short", hour: "2-digit",
+    minute: "2-digit", hourCycle: "h23"}).formatToParts(new Date()).map(x => [x.type, x.value]));
+  return {wd: p.weekday, hm: parseInt(p.hour, 10) * 100 + parseInt(p.minute, 10)};
+}
+function inSession(key){
+  const {wd, hm} = tzNow(key === "hk" ? "Asia/Hong_Kong" : "America/New_York");
+  if (wd === "Sat" || wd === "Sun") return false;
+  return hm >= 930 && hm <= (key === "hk" ? 1615 : 1605);
+}
+function checkStale(d){
+  const el = $("stale"); if (!el || !d) return;
+  const age = (Date.now() - new Date(d.updated.replace(" ", "T") + ":00+08:00")) / 60000;
+  const show = inSession(d.market.key) && age > 45;
+  el.hidden = !show;
+  if (show) el.textContent = `⚠ 分析數據已經 ${Math.round(age)} 分鐘冇更新(最後更新 ${d.updated.slice(11)} 香港時間),評分同買賣位可能過時;上面嘅即時報價仍然係最新。`;
+}
+
 function render(d){
+  checkStale(d);
   const ixn = d.market.index_name;
   $("upd").textContent = `${d.market.name} · 更新:${d.updated} 香港時間(${d.session},數據截至 ${d.asof})`;
   $("idxname").textContent = ixn;
@@ -547,6 +569,7 @@ async function liveTick(){
   if (view === "hold") renderHoldings();
 }
 function applyLive(){
+  if (DATA[view]) checkStale(DATA[view]);
   const bar = $("livebar");
   if (liveErr && !liveAt) { bar.innerHTML = `<span class="sub">即時報價暫時取唔到,顯示最後分析數字</span>`; return; }
   const idx = view === "hold" ? [LIVE_IDX.hk[0], LIVE_IDX.us[0]] : (LIVE_IDX[view] || []);
