@@ -179,6 +179,13 @@ def run(m: Market, use_news: bool = True, use_ai: bool = True, save: bool = True
         return row
 
     short_picks = [pick(t, float(final[t]), "short") for t in final.nlargest(10).index]
+    # strongest 2 per theme, so a weak sector still shows its best names (display only, not a forecast)
+    sector_best = []
+    for th in sorted(m.themes, key=lambda x: -heat.get(x, 0)):
+        members = final[[t for t in final.index if themes_of.get(t) == th]]
+        if len(members):
+            sector_best.append({"theme": th, "heat": heat.get(th),
+                                "picks": [pick(t, float(members[t]), "short") for t in members.nlargest(2).index]})
     lscore = long.iloc[-1].drop(labels=list(suspended), errors="ignore").dropna()
     long_picks = [pick(t, float(lscore[t]), "long") for t in lscore.nlargest(10).index]
     fund = _fundamentals([p["ticker"] for p in long_picks + short_picks])
@@ -240,7 +247,7 @@ def run(m: Market, use_news: bool = True, use_ai: bool = True, save: bool = True
 
     out = {"updated": now.strftime("%Y-%m-%d %H:%M"), "session": session, "asof": asof,
            "regime": reg, "market": market, "themes": themes, "southbound": sb_out,
-           "short": short_picks, "long": long_picks, "stocks": stocks, "upcoming": upcoming, "claude_live": claude_live,
+           "short": short_picks, "long": long_picks, "sector_best": sector_best, "stocks": stocks, "upcoming": upcoming, "claude_live": claude_live,
            "us_flow": None if m.key != "us" else {"etf": flows.etf_flows(prices, f, m), "insider": flows.insider_buys({**names, **m.extras})},
            "news": [{k: v for k, v in it.items() if k != "ts"} for it in items[:60]],
            "backtest": bt, "live": live,

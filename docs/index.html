@@ -183,6 +183,12 @@ button.tbtn{background:var(--chip);color:var(--ink);border:1px solid var(--borde
   </div>
 
   <div class="card">
+    <h2>各板塊最強(短炒分)</h2>
+    <div class="sub">每個板塊揀短炒分最高嘅 2 隻,板塊按熱度排。就算成個板塊弱,都睇到入面相對最強嘅係邊隻。分數低過 50 代表喺股票池入面屬中下游,唔等於值得買。</div>
+    <div class="scroll" style="margin-top:8px"><table id="sector"></table></div>
+  </div>
+
+  <div class="card">
     <h2>長揸候選(3-12個月)</h2>
     <div class="sub" style="margin-bottom:10px">收集區 = 50天線附近至200天線上方,分段買;長線止蝕 = 200天線下 3% 或收集區底減 1.5 個 ATR。</div>
     <div class="picks" id="long"></div>
@@ -411,6 +417,14 @@ function render(d){
 
   $("short").innerHTML = d.short.map(p => pickCard(p, "short")).join("");
   $("long").innerHTML = d.long.map(p => pickCard(p, "long")).join("");
+  $("sector").innerHTML = `<tr><th>板塊</th><th class="l">股票</th><th>短炒分</th><th>5日</th><th>20日</th><th>買入區</th><th>止蝕</th><th class="l">即時</th></tr>` +
+    (d.sector_best || []).map(g => g.picks.map((p, i) => { PICK[p.ticker] = p; const s = p.plan.short;
+      return `<tr>${i === 0 ? `<td rowspan="${g.picks.length}">${esc(g.theme)}<div class="sub">熱度 ${Math.round(g.heat)}</div></td>` : ""}
+        <td class="l">${esc(p.name)} <span class="sub">${esc(p.ticker)}</span>${earnNote(p) ? ` <span class="wrn">📅</span>` : ""}</td>
+        <td><b class="${p.score >= 60 ? "pos" : p.score < 40 ? "neg" : ""}">${Math.round(p.score)}</b></td>
+        <td class="${cls(p.ret5)}">${pct(p.ret5)}</td><td class="${cls(p.ret20)}">${pct(p.ret20)}</td>
+        <td>${px(s.entry_low)} – ${px(s.entry_high)}</td><td class="neg">${px(s.stop)}</td>
+        <td class="l"><span class="livepx" data-t="${esc(p.ticker)}" data-k="short"></span></td></tr>`; }).join("")).join("");
   $("news").innerHTML = d.news.slice(0,40).map(n => `<li><span class="sub">${esc(n.time)} ${esc(n.source)}</span> <a href="${esc(n.link)}" target="_blank" rel="noopener">${esc(n.title)}</a> ${n.themes.map(t => `<span class="tag">${esc(t)}</span>`).join("")}</li>`).join("");
 
   const b = d.backtest, row = (name, x, metric) => x ? `<tr><td>${name}</td><td>${x.start ? x.start+" 至 "+x.end : "近五年"}</td><td>${x.n}</td><td>${metric}</td><td>${x.t}</td><td class="${x.pass?"pass":"fail"}">${x.pass?"合格":"未證實有效"}</td><td class="l sub">${esc(x.rule)}</td></tr>` : "";
