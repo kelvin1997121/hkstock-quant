@@ -54,12 +54,13 @@ TZ = {"hk": HKT, "us": ZoneInfo("America/New_York")}
 CAPITAL = 100_000.0
 SLIP = {"hk": 0.001, "us": 0.0005}
 MAX_POSITION = 0.25      # of equity, checked when the order is placed
+MAX_ONE_LOT = 0.45       # an HK board lot may go up to this, so big-lot blue chips stay tradeable
 MAX_REASON, MAX_PLAN = 200, 700
 FX_DEFAULT = 7.8
 INDEX = {"hk": "^HSI", "us": "^GSPC"}
 STOCK_FILES = {"hk": "data.json", "us": "us.json"}
 RULES = ("起始資金 10 萬港元;港股美股共用現金(美元按當日匯率);唔可以借錢或者沽空;"
-         f"每隻股票落單時最多佔資產 {MAX_POSITION:.0%};買入一定要有止蝕;"
+         f"每隻股票落單時最多佔資產 {MAX_POSITION:.0%}(港股每手太大嘅可以買一手,最多 {MAX_ONE_LOT:.0%});買入一定要有止蝕;"
          "落單後由下一個開市時段先生效,用真實開市價/最高/最低價成交;費用按富途收費估算。")
 
 
@@ -431,8 +432,11 @@ def build_view(final: dict, live: dict, entries: list[dict], bars: Bars, now: da
     final["history"] = history
     nm = names()
     orders = []
+    cancel_asked = {e["order"] for e in entries if e["type"] == "cancel"}
     for e in reversed([e for e in entries if e["type"] in ("buy", "sell")][-40:]):
         o = live["orders"].get(str(e["id"]), {"status": "waiting", "note": "等下一個開市時段"})
+        if o["status"] in ("pending", "waiting") and e["id"] in cancel_asked:
+            o = {"status": "cancelling", "note": "已要求取消,下一個開市時段生效"}
         orders.append({"id": e["id"], "placed": hkt_str(e["t"]), "ticker": e["ticker"], "name": nm.get(e["ticker"], e["ticker"]),
                        "side": e["side"], "shares": e["shares"], "limit": e.get("limit"), "stop": e.get("stop"),
                        "target": e.get("target"), "days": e.get("days", 1), "status": o["status"],
@@ -501,19 +505,29 @@ def _stocks() -> dict:
     return out
 
 
-def _pending_estimates(view: dict) -> tuple[float, dict]:
-    """HKD tied up in open buy orders, and shares tied up in open sell orders."""
-    buy, sell = 0.0, {}
-    for o in view.get("orders", []):
-        if o["status"] not in ("pending", "waiting"):
-            continue
+def _open_orders(view: dict) -> list[dict]:
+    """Buy/sell orders still waiting to fill, read from the order book itself so that orders placed
+    earlier in the same run (not yet in docs/paper.json) count too."""
+    status = {o["id"]: o["status"] for o in view.get("orders", [])}
+    entries = read_json(ORDERS, {"entries": []})["entries"]
+    cancelled = {e["order"] for e in entries if e["type"] == "cancel"}
+    return [e for e in entries if e["type"] in ("buy", "sell") and e["id"] not in cancelled
+            and status.get(e["id"], "waiting") in ("pending", "waiting")]
+
+
+def _pending_estimates(view: dict) -> tuple[float, dict, dict]:
+    """HKD tied up in open buy orders (total and by ticker), and shares tied up in open sell orders."""
+    stocks = _stocks()
+    buy, by_ticker, sell = 0.0, {}, {}
+    for o in _open_orders(view):
         if o["side"] == "buy":
             fx = view.get("fx", FX_DEFAULT) if market_of(o["ticker"]) == "us" else 1.0
-            ref = o["limit"] or _stocks().get(o["ticker"], {}).get("close", 0)
-            buy += o["shares"] * ref * fx * 1.003
+            v = o["shares"] * (o.get("limit") or stocks.get(o["ticker"], {}).get("close", 0)) * fx
+            buy += v * 1.003
+            by_ticker[o["ticker"]] = by_ticker.get(o["ticker"], 0) + v
         else:
             sell[o["ticker"]] = sell.get(o["ticker"], 0) + o["shares"]
-    return buy, sell
+    return buy, by_ticker, sell
 
 
 def _append(entry: dict) -> dict:
@@ -556,7 +570,7 @@ def place_order(ticker: str, side: str, shares: int, limit=None, stop=None, targ
         raise SystemExit(f"限價 {limit} 離收市價 {close} 超過 15%")
     reason = _reason(reason)
     pos = {p["ticker"]: p for p in view["positions"]}
-    pend_buy, pend_sell = _pending_estimates(view)
+    pend_buy, pend_by_ticker, pend_sell = _pending_estimates(view)
     if side == "buy":
         ref = limit or close
         if stop is None or not 0.6 * ref <= stop < ref:
@@ -565,10 +579,13 @@ def place_order(ticker: str, side: str, shares: int, limit=None, stop=None, targ
             raise SystemExit("目標價要高過買入價")
         fx = view["fx"] if m == "us" else 1.0
         cost = shares * ref * fx
-        held = pos.get(ticker, {}).get("value_hkd", 0)
-        if held + cost > MAX_POSITION * view["equity"]:
-            raise SystemExit(f"超過單一股票上限:持有 {held:,.0f} + 新買 {cost:,.0f} 港元 > 資產 {MAX_POSITION:.0%}"
-                             f"({MAX_POSITION * view['equity']:,.0f})")
+        held = pos.get(ticker, {}).get("value_hkd", 0) + pend_by_ticker.get(ticker, 0)
+        cap = MAX_POSITION * view["equity"]
+        if m == "hk" and not held and shares == lot:            # a single board lot of a big-lot stock
+            cap = max(cap, min(cost, MAX_ONE_LOT * view["equity"]))
+        if held + cost > cap + 1e-6:
+            raise SystemExit(f"超過單一股票上限:持有 {held:,.0f} + 新買 {cost:,.0f} 港元 > {cap:,.0f}"
+                             f"(資產 {MAX_POSITION:.0%};港股一手最多 {MAX_ONE_LOT:.0%})")
         if cost * 1.003 > view["cash"] - pend_buy:
             raise SystemExit(f"現金唔夠:可用約 {view['cash'] - pend_buy:,.0f} 港元,呢張單約 {cost:,.0f}")
     else:
@@ -586,9 +603,7 @@ def place_order(ticker: str, side: str, shares: int, limit=None, stop=None, targ
 
 
 def cancel(order_id: int, reason: str) -> dict:
-    view = read_json(VIEW, {})
-    o = next((o for o in view.get("orders", []) if o["id"] == order_id), None)
-    if not o or o["status"] not in ("pending", "waiting"):
+    if not any(o["id"] == order_id for o in _open_orders(read_json(VIEW, {}))):
         raise SystemExit(f"單號 {order_id} 唔係等緊成交嘅單")
     return _append({"type": "cancel", "order": order_id, "reason": _reason(reason)})
 

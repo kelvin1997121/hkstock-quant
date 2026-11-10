@@ -132,3 +132,46 @@ def test_sell_order_and_missing_position():
     final, _ = run(e, bars({"0700.HK": {"2026-11-03": (110, 111, 109, 110)}}), datetime(2026, 11, 4, 0, 0, tzinfo=UTC))
     assert final["trades"][0]["exit"] == pytest.approx(110 * 0.999) and final["trades"][0]["pnl_hkd"] > 0
     assert final["orders"]["3"]["status"] == "rejected"
+
+
+@pytest.fixture
+def book(tmp_path, monkeypatch):
+    """An empty account and two stocks, all in a temp folder."""
+    import json
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "data.json").write_text(json.dumps({"stocks": {"0700.HK": {"name": "騰訊", "close": 400.0}}}))
+    (tmp_path / "docs" / "us.json").write_text(json.dumps({"stocks": {"AAPL": {"name": "蘋果", "close": 300.0},
+        "MSFT": {"name": "微軟", "close": 400.0}, "NVDA": {"name": "輝達", "close": 200.0}}}))
+    view = {"equity": 100000.0, "cash": 100000.0, "fx": 7.8, "positions": [], "orders": []}
+    (tmp_path / "docs" / "paper.json").write_text(json.dumps(view))
+    (tmp_path / "lots.json").write_text(json.dumps({"0700.HK": 100}))
+    monkeypatch.setattr(paper, "DOCS", tmp_path / "docs")
+    monkeypatch.setattr(paper, "VIEW", tmp_path / "docs" / "paper.json")
+    monkeypatch.setattr(paper, "ORDERS", tmp_path / "orders.json")
+    monkeypatch.setattr(paper, "LOTS", tmp_path / "lots.json")
+    return tmp_path
+
+
+def test_order_checks(book):
+    with pytest.raises(SystemExit, match="倍數"):
+        paper.place_order("0700.HK", "buy", 150, stop=380, reason="測試每手")
+    with pytest.raises(SystemExit, match="止蝕"):
+        paper.place_order("0700.HK", "buy", 100, reason="冇止蝕測試")
+    paper.place_order("0700.HK", "buy", 100, stop=380, reason="一手 4 萬,准許")          # 40% via the one-lot rule
+    with pytest.raises(SystemExit, match="上限"):                                       # same-run order counts
+        paper.place_order("0700.HK", "buy", 100, stop=380, reason="再買一手")
+    paper.place_order("AAPL", "buy", 10, stop=290, reason="2.3 萬港元")
+    with pytest.raises(SystemExit, match="上限"):
+        paper.place_order("AAPL", "buy", 1, stop=290, reason="2.3 萬 + 2340 > 2.5 萬")
+    paper.place_order("MSFT", "buy", 6, stop=380, reason="1.9 萬港元,仲有現金")
+    with pytest.raises(SystemExit, match="現金唔夠"):                                   # 40k + 23.4k + 18.7k already out
+        paper.place_order("NVDA", "buy", 12, stop=190, reason="1.9 萬港元,現金唔夠")
+    with pytest.raises(SystemExit, match="可以沽"):
+        paper.place_order("AAPL", "sell", 1, reason="冇持倉測試")
+
+
+def test_cancel_an_order_from_the_same_run(book):
+    e = paper.place_order("AAPL", "buy", 10, stop=290, reason="測試取消")
+    paper.cancel(e["id"], "改變主意")
+    with pytest.raises(SystemExit):
+        paper.cancel(e["id"], "再取消")
