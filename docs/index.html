@@ -184,6 +184,12 @@ button.tbtn{background:var(--chip);color:var(--ink);border:1px solid var(--borde
     <div class="picks" id="short" style="margin-top:10px"></div>
   </div>
 
+  <div class="card" id="techcard" hidden>
+    <h2>科技股短炒候選(1-2星期)</h2>
+    <div class="sub" id="techsub"></div>
+    <div class="picks" id="tech" style="margin-top:10px"></div>
+  </div>
+
   <div class="card">
     <h2>各板塊最強(短炒分)</h2>
     <div class="sub">每個板塊揀短炒分最高嘅 2 隻,板塊按熱度排。就算成個板塊弱,都睇到入面相對最強嘅係邊隻。分數低過 50 代表喺股票池入面屬中下游,唔等於值得買。</div>
@@ -442,6 +448,10 @@ function render(d){
   }
 
   $("short").innerHTML = d.short.map(p => pickCard(p, "short")).join("");
+  const tech = d.tech || [];
+  $("techcard").hidden = !tech.length;
+  $("techsub").textContent = `科技板塊(${(d.tech_themes || []).join("、")})入面短炒分最高嘅 ${tech.length} 隻,分數、買入區、止蝕同目標都同上面用同一套規則,所以可能同上面重複。分數低過 50 代表喺成個股票池屬中下游,只係科技股入面相對最強,唔等於值得買。`;
+  $("tech").innerHTML = tech.map(p => pickCard(p, "short")).join("");
   $("long").innerHTML = d.long.map(p => pickCard(p, "long")).join("");
   $("sector").innerHTML = `<tr><th>板塊</th><th class="l">股票</th><th>短炒分</th><th>5日</th><th>20日</th><th>買入區</th><th>止蝕</th><th class="l">即時</th></tr>` +
     (d.sector_best || []).map(g => g.picks.map((p, i) => { PICK[p.ticker] = p; const s = p.plan.short;
@@ -607,7 +617,7 @@ function liveCodes(){
   else {
     (LIVE_IDX[view] || []).forEach(x => c.push(x[0]));
     const d = DATA[view];
-    if (d) [...d.short, ...d.long, ...(d.sector_best || []).flatMap(g => g.picks)].forEach(p => c.push(tcCode(p.ticker)));
+    if (d) [...d.short, ...d.long, ...(d.tech || []), ...(d.sector_best || []).flatMap(g => g.picks)].forEach(p => c.push(tcCode(p.ticker)));
   }
   ["hk", "us"].forEach(k => LIVE_IDX[k].slice(0, 1).forEach(x => c.push(x[0])));
   return c;

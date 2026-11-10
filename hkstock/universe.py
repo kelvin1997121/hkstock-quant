@@ -171,6 +171,7 @@ class Market:
     suffix: str = ""
     extras: dict = field(default_factory=dict)
     flow_etfs: dict = field(default_factory=dict)
+    tech_themes: tuple = ()  # themes shown together as 科技股短炒候選 (display only)
 
     def names(self) -> dict[str, str]:
         return {t: n for group in self.themes.values() for t, n in group.items()}
@@ -186,6 +187,7 @@ HK = Market(
            "經濟通": "https://www.etnet.com.hk/www/tc/news/rss.php?section=editor"},
     google=(("港股", "zh"), ("恒指", "zh"), ("南向資金", "zh"), ("港股 板塊", "zh"), ("美股 收市", "zh")),
     out="data.json", suffix="",
+    tech_themes=("科網平台", "AI及半導體", "機器人及自動化", "新能源車"),
 )
 
 US = Market(
@@ -194,6 +196,7 @@ US = Market(
     google=(("美股", "zh"), ("華爾街 股市", "zh"), ("聯儲局 減息", "zh"), ("納指 科技股", "zh"),
             ("stock market today", "en"), ("Wall Street stocks", "en"), ("stocks rally OR selloff", "en")),
     out="us.json", suffix="_us", extras=US_EXTRAS, flow_etfs=US_FLOW_ETFS,
+    tech_themes=("大型科技", "AI晶片", "半導體設備", "AI軟件及雲", "AI網絡及光通訊", "量子計算", "電動車及自動駕駛"),
 )
 
 MARKETS = {"hk": HK, "us": US}

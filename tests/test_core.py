@@ -176,3 +176,10 @@ def test_upcoming_earnings_window():
     cal = {"A": {"earnings": "2026-11-12"}, "B": {"earnings": "2026-12-30"}, "C": {"earnings": None}}
     up = events.upcoming(cal, {"A": "甲"}, within=7, today=date(2026, 11, 10))
     assert up == [{"ticker": "A", "name": "甲", "date": "2026-11-12", "days": 2}]
+
+
+def test_tech_themes_exist():
+    """科技股短炒候選 reads these names; a typo would silently drop a sector from the cards."""
+    for m in (HK, US):
+        assert m.tech_themes, m.key
+        assert set(m.tech_themes) <= set(m.themes), set(m.tech_themes) - set(m.themes)

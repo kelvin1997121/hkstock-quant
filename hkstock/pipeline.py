@@ -189,6 +189,10 @@ def run(m: Market, use_news: bool = True, use_ai: bool = True, save: bool = True
         return row
 
     short_picks = [pick(t, float(final[t]), "short") for t in final.nlargest(10).index]
+    # best 6 of the tech themes by the same score, shown as cards beside the top 10
+    # (display only: not logged, so the live record still covers the top 10 alone)
+    tech = final[[t for t in final.index if themes_of.get(t) in m.tech_themes]]
+    tech_picks = [pick(t, float(tech[t]), "short") for t in tech.nlargest(6).index]
     # strongest 2 per theme, so a weak sector still shows its best names (display only, not a forecast)
     sector_best = []
     # the sector table needs only these fields (no price chart or reasons)
@@ -201,8 +205,8 @@ def run(m: Market, use_news: bool = True, use_ai: bool = True, save: bool = True
                                 "picks": [slim(pick(t, float(members[t]), "short")) for t in members.nlargest(2).index]})
     lscore = long.iloc[-1].drop(labels=list(suspended), errors="ignore").dropna()
     long_picks = [pick(t, float(lscore[t]), "long") for t in lscore.nlargest(10).index]
-    fund = _fundamentals([p["ticker"] for p in long_picks + short_picks])
-    for p in short_picks + long_picks:
+    fund = _fundamentals(list(dict.fromkeys(p["ticker"] for p in long_picks + short_picks + tech_picks)))
+    for p in short_picks + long_picks + tech_picks:
         p["fund"] = fund.get(p["ticker"])
 
     print("  backtest")
@@ -229,7 +233,7 @@ def run(m: Market, use_news: bool = True, use_ai: bool = True, save: bool = True
         e = cal.get(t, {})
         st["earnings"], st["ex_div"] = e.get("earnings"), e.get("ex_div")
         st["earn_days"] = events.days_until(e.get("earnings"), data.local_now(m).date())
-    for p in short_picks + long_picks + [x for g in sector_best for x in g["picks"]]:
+    for p in short_picks + long_picks + tech_picks + [x for g in sector_best for x in g["picks"]]:
         p["earnings"], p["earn_days"] = stocks[p["ticker"]]["earnings"], stocks[p["ticker"]]["earn_days"]
     all_names = {**names, **m.extras}
     upcoming = events.upcoming(cal, all_names, 7, data.local_now(m).date())
@@ -261,7 +265,8 @@ def run(m: Market, use_news: bool = True, use_ai: bool = True, save: bool = True
 
     out = {"updated": now.strftime("%Y-%m-%d %H:%M"), "session": session, "asof": asof,
            "regime": reg, "market": market, "themes": themes, "southbound": sb_out,
-           "short": short_picks, "long": long_picks, "sector_best": sector_best, "stocks": stocks, "upcoming": upcoming, "claude_live": claude_live,
+           "short": short_picks, "long": long_picks, "tech": tech_picks, "tech_themes": list(m.tech_themes),
+           "sector_best": sector_best, "stocks": stocks, "upcoming": upcoming, "claude_live": claude_live,
            "us_flow": None if m.key != "us" else {"etf": flows.etf_flows(prices, f, m), "insider": flows.insider_buys({**names, **m.extras})},
            "news": [{k: v for k, v in it.items() if k != "ts"} for it in items[:40]],  # page shows 40
            "backtest": bt, "live": live,
