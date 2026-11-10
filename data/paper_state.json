@@ -1,20 +1,86 @@
 {
  "start": "2026-11-10T07:02:10Z",
  "capital": 100000.0,
- "through": "2026-11-10T07:02:10Z",
- "cash": 100000.0,
- "positions": {},
- "orders": {},
- "fills": [],
+ "through": "2026-11-10T14:30:00Z",
+ "cash": 83353.62534488678,
+ "positions": {
+  "COST": {
+   "shares": 2,
+   "cost": 1060.995,
+   "market": "us",
+   "opened": "2026-11-10",
+   "reason": "Costco創20日新高,業績12月11日遠;今晚CPI前用限價,美股波幅高故細注",
+   "order": 5,
+   "setup": "突破",
+   "ctx": {
+    "market": "us",
+    "regime": "偏淡",
+    "regime_score": -24,
+    "theme": "消費零售",
+    "theme_verdict": "資金先行,新聞未熱",
+    "short_score": 83.0,
+    "long_score": 77.0,
+    "rsi": 70.0,
+    "ret5": 0.0246,
+    "ret20": 0.1129,
+    "above_ma50": true,
+    "above_ma200": true,
+    "earn_days": 31,
+    "stop_pct": -0.0347
+   },
+   "risk": 37.804999999999836,
+   "stop": 1023.19,
+   "target": 1093.14
+  }
+ },
+ "orders": {
+  "1": {
+   "status": "pending",
+   "seen": 0,
+   "note": ""
+  },
+  "2": {
+   "status": "pending",
+   "seen": 0,
+   "note": ""
+  },
+  "3": {
+   "status": "pending",
+   "seen": 0,
+   "note": ""
+  },
+  "4": {
+   "status": "pending",
+   "seen": 0,
+   "note": ""
+  },
+  "5": {
+   "status": "filled",
+   "seen": 0,
+   "note": ""
+  }
+ },
+ "fills": [
+  {
+   "date": "2026-11-10",
+   "ticker": "COST",
+   "side": "buy",
+   "shares": 2,
+   "price": 1060.0,
+   "fee_hkd": 15.61,
+   "fx": 7.8447,
+   "why": "單號 5"
+  }
+ ],
  "trades": [],
- "fees": 0.0,
+ "fees": 15.61095272064209,
  "history": {
   "2026-11-10": {
    "equity": 100049.19,
    "bench": 99892.99
   },
   "2026-11-11": {
-   "equity": 100080.73,
+   "equity": 100080.72,
    "bench": 100052.18
   }
  }
