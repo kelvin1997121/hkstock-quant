@@ -257,6 +257,15 @@ button.tbtn{background:var(--chip);color:var(--ink);border:1px solid var(--borde
       <div class="scroll" style="margin-top:6px"><table id="ptr"></table></div>
     </div>
     <div class="card">
+      <h2>學習紀錄</h2>
+      <div class="sub">每單平倉之後,系統自動計:賺/蝕幾多個 R(R = 賺蝕 ÷ 當初止蝕距離)、揸住期間最高曾賺同最多曾蝕幾多、平倉後 5 日點行。
+        Claude 每單都要寫檢討,再整理成教訓:「試行」= 優先考慮;要有最少 <span id="pminadopt">5</span> 單交易做證據先可以變「採用」(必須遵守);之後嘅交易推翻咗就「放棄」。
+        少過 <span id="pminn">10</span> 單嘅組別一律當「樣本唔夠」,免得幾單好彩/唔好彩就改策略。系統本身嘅評分唔會因為模擬倉結果自動改,要先過預先登記嘅測試。</div>
+      <div id="plessons" style="margin-top:8px"></div>
+      <div id="pdiag" style="margin-top:8px"></div>
+      <div class="scroll" style="margin-top:8px"><table id="pgroups"></table></div>
+    </div>
+    <div class="card">
       <h2>規則</h2>
       <div class="sub" id="prules"></div>
     </div>
@@ -670,9 +679,25 @@ function renderPaper(){
     p.controls.map(c => `${esc(c.placed)} ${c.type === "cancel" ? `取消 #${c.order}` : `${esc(c.ticker)} 止蝕 ${px(c.stop)} 目標 ${px(c.target)}`}(${esc(c.reason)})`).join(";") + `</div>` : "";
   $("pstats").textContent = st.trades ? `已實現盈虧 ${num(st.realised, 0)} 港元 · 平均賺 ${pct(st.avg_win)} · 平均蝕 ${pct(st.avg_loss)}` +
     ` · 盈虧比 ${st.profit_factor ?? "–"} · 最大回撤 ${pct(st.max_drawdown)}` : `未有平倉交易。最大回撤 ${pct(st.max_drawdown)}`;
-  $("ptr").innerHTML = p.trades.length ? `<tr><th>股票</th><th>開倉 → 平倉</th><th>股數</th><th>成本</th><th>賣出</th><th>盈虧(港元)</th><th>點樣平倉</th><th class="l">當初買入理由</th></tr>` +
-    p.trades.map(t => `<tr><td>${esc(t.name)} <span class="sub">${esc(t.ticker)}</span></td><td>${esc(t.opened)} → ${esc(t.closed)}</td><td>${num(t.shares, 0)}</td>
-      <td>${px(t.entry)}</td><td>${px(t.exit)}</td><td class="${cls(t.pnl_hkd)}">${num(t.pnl_hkd, 0)}(${pct(t.pnl_pct)})</td><td>${esc(t.why)}</td><td class="l">${esc(t.reason)}</td></tr>`).join("") : "";
+  $("ptr").innerHTML = p.trades.length ? `<tr><th>#</th><th>股票</th><th>類型</th><th>開倉 → 平倉</th><th>成本 → 賣出</th><th>盈虧(港元)</th><th>R</th><th>最高曾賺 / 最多曾蝕</th><th>平倉後5日</th><th>點樣平倉</th><th class="l">買入理由 / Claude 檢討</th></tr>` +
+    p.trades.map(t => `<tr><td>${t.id ?? ""}</td><td>${esc(t.name)} <span class="sub">${esc(t.ticker)}</span></td><td>${esc(t.setup || "")}</td><td>${esc(t.opened)} → ${esc(t.closed)}</td>
+      <td>${px(t.entry)} → ${px(t.exit)}</td><td class="${cls(t.pnl_hkd)}">${num(t.pnl_hkd, 0)}(${pct(t.pnl_pct)})</td>
+      <td class="${cls(t.r)}">${t.r == null ? "–" : (t.r > 0 ? "+" : "") + t.r.toFixed(2)}</td><td>${pct(t.mfe)} / ${pct(t.mae)}</td><td class="${cls(t.after5)}">${pct(t.after5)}</td>
+      <td>${esc(t.why)}</td><td class="l">${esc(t.reason)}${t.review ? `<div class="sub" style="margin-top:4px"><b>檢討:</b>${esc(t.review)}</div>` : `<div class="sub">未檢討</div>`}</td></tr>`).join("") : "";
+  const ln = p.learn, LS = {"採用": "pos", "試行": "wrn", "放棄": ""};
+  if (ln) {
+    $("pminn").textContent = ln.min_n; $("pminadopt").textContent = ln.min_adopt;
+    $("plessons").innerHTML = (p.lessons || []).length ? `<div class="sub"><b>Claude 嘅教訓</b></div>` + p.lessons.map(L =>
+      `<div style="margin-top:4px"><span class="${LS[L.status] ?? ""}">[${esc(L.status)}]</span> ${esc(L.id)} ${esc(L.text)} <span class="sub">證據:交易 ${L.evidence.join(", ") || "–"}${L.history.at(-1)?.note ? " · " + esc(L.history.at(-1).note) : ""}</span></div>`).join("")
+      : `<div class="sub">未有教訓。有交易平倉之後 Claude 會開始寫。</div>`;
+    $("pdiag").innerHTML = ln.diagnostics.map(x => `<div class="note">${esc(x)}</div>`).join("");
+    const V = {"樣本唔夠": "sub", "未見分別": "", "有跡象賺": "pos", "有跡象蝕": "neg"};
+    $("pgroups").innerHTML = ln.overall.n ? `<tr><th class="l">分組</th><th>交易數</th><th>勝率</th><th>平均 R</th><th>盈虧(港元)</th><th>t 值</th><th>結論</th></tr>
+      <tr><td class="l"><b>全部</b></td><td>${ln.overall.n}</td><td>${pct(ln.overall.win_rate, 0)}</td><td>${ln.overall.avg_r ?? "–"}</td><td class="${cls(ln.overall.pnl_hkd)}">${num(ln.overall.pnl_hkd, 0)}</td><td>${ln.overall.t ?? "–"}</td><td class="${V[ln.overall.verdict] ?? ""}">${esc(ln.overall.verdict)}</td></tr>` +
+      ln.groups.map(g => `<tr><td class="l">${esc(g.dim)}:${esc(g.key)}</td><td>${g.n}</td><td>${pct(g.win_rate, 0)}</td><td class="${cls(g.avg_r)}">${g.avg_r ?? "–"}</td>
+        <td class="${cls(g.pnl_hkd)}">${num(g.pnl_hkd, 0)}</td><td>${g.t ?? "–"}</td><td class="${V[g.verdict] ?? ""}">${esc(g.verdict)}</td></tr>`).join("")
+      : `<tr><td class="l sub">未有已平倉交易,未有統計。</td></tr>`;
+  }
   $("prules").textContent = p.rules + ` 成本已包括買入費用;美股按 1 美元 = ${p.fx} 港元計;股息唔計。即時價只影響呢頁顯示,成交以分析更新時嘅 Yahoo 價為準。`;
 }
 

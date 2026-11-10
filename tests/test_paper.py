@@ -175,3 +175,51 @@ def test_cancel_an_order_from_the_same_run(book):
     paper.cancel(e["id"], "改變主意")
     with pytest.raises(SystemExit):
         paper.cancel(e["id"], "再取消")
+
+
+# ---------------------------------------------------------------- learning
+from hkstock import paper_learn  # noqa: E402
+
+
+def test_closed_trade_carries_setup_context_and_r():
+    e = [order(1, "2026-11-02T00:30:00Z", "0700.HK", stop=95.0, setup="突破", ctx={"regime": "偏好", "short_score": 80})]
+    b = bars({"0700.HK": {"2026-11-03": (97, 98, 93, 94), "2026-11-04": (96, 99, 95, 98)}})
+    final, _ = run(e, b, datetime(2026, 11, 13, 0, 0, tzinfo=UTC))
+    t = final["trades"][0]
+    assert t["id"] == 1 and t["setup"] == "突破" and t["ctx"]["regime"] == "偏好"
+    assert -1.25 < t["r"] < -1.0                       # a stop-out loses about 1R, a bit more after costs
+    x = paper_learn.trade_extras(t, b)
+    assert x["mae"] == pytest.approx(93 / t["entry"] - 1, abs=1e-4)
+    assert x["after5"] is not None and x["held"] == 2
+
+
+def _trades(n, r, setup="突破"):
+    return [{"id": i, "ticker": "X", "market": "us", "setup": setup, "why": "止蝕" if r < 0 else "到目標",
+             "pnl_hkd": 100 * r, "pnl_pct": 0.05 * r, "r": r + (0.1 if i % 2 else -0.1), "entry": 10, "exit": 10,
+             "ctx": {"regime": "偏好"}} for i in range(n)]
+
+
+def test_groups_stay_humble_on_small_samples():
+    g = {(x["dim"], x["key"]): x for x in paper_learn.groups(_trades(4, 1.5))}
+    assert g[("買入類型", "突破")]["verdict"] == "樣本唔夠"
+    g = {(x["dim"], x["key"]): x for x in paper_learn.groups(_trades(12, 1.5) + _trades(12, -1.0, "回調"))}
+    assert g[("買入類型", "突破")]["verdict"] == "有跡象賺"
+    assert g[("買入類型", "回調")]["verdict"] == "有跡象蝕"
+
+
+def test_lessons_need_evidence_before_adoption(book):
+    import json
+    view = json.loads((book / "docs" / "paper.json").read_text(encoding="utf-8"))
+    view["trades"] = [{"id": i} for i in range(1, 7)]
+    (book / "docs" / "paper.json").write_text(json.dumps(view))
+    paper.add_lesson("業績前兩日唔好開新倉", [1, 2], None, None)
+    with pytest.raises(SystemExit, match="最少"):
+        paper.add_lesson(None, [3], "採用", "L1", "想採用")
+    with pytest.raises(SystemExit, match="唔存在"):
+        paper.add_lesson(None, [99], "採用", "L1", "想採用")
+    paper.add_lesson(None, [3, 4, 5], "採用", "L1", "再多三單都係咁")
+    L = paper_learn.fold_lessons(json.loads((book / "orders.json").read_text(encoding="utf-8"))["entries"])[0]
+    assert L["id"] == "L1" and L["status"] == "採用" and L["evidence"] == [1, 2, 3, 4, 5]
+    paper.add_review(2, "止蝕太近,開市波動已經掃走")
+    with pytest.raises(SystemExit, match="檢討過"):
+        paper.add_review(2, "再寫一次檢討應該唔得")

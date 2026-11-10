@@ -44,6 +44,7 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from . import market_days
+from . import paper_learn as learn
 
 ROOT = Path(__file__).resolve().parent.parent
 DATA, DOCS = ROOT / "data", ROOT / "docs"
@@ -56,6 +57,9 @@ SLIP = {"hk": 0.001, "us": 0.0005}
 MAX_POSITION = 0.25      # of equity, checked when the order is placed
 MAX_ONE_LOT = 0.45       # an HK board lot may go up to this, so big-lot blue chips stay tradeable
 MAX_REASON, MAX_PLAN = 200, 700
+SETUPS = ("突破", "回調", "超賣反彈", "趨勢跟隨", "消息/業績", "其他")   # the kind of trade, for the learning stats
+MAX_REVIEW, MAX_LESSON = 300, 200
+MIN_ADOPT = 5           # a lesson needs this many supporting closed trades before it becomes a hard rule
 FX_DEFAULT = 7.8
 INDEX = {"hk": "^HSI", "us": "^GSPC"}
 STOCK_FILES = {"hk": "data.json", "us": "us.json"}
@@ -218,7 +222,11 @@ def _fill_buy(st, o, price, m, d, fx, why):
         p["shares"] += shares
     else:
         p = st["positions"][o["ticker"]] = {"shares": shares, "cost": (v + f) / shares, "market": m,
-                                            "opened": d.isoformat(), "reason": o.get("reason", "")}
+                                            "opened": d.isoformat(), "reason": o.get("reason", ""),
+                                            "order": o.get("id"), "setup": o.get("setup", "其他"),
+                                            "ctx": o.get("ctx", {})}
+        if o.get("stop") is not None and o["stop"] < p["cost"]:
+            p["risk"] = p["cost"] - o["stop"]          # first stop distance per share = 1R
     if o.get("stop") is not None:
         p["stop"] = o["stop"]
     if o.get("target") is not None:
@@ -244,7 +252,9 @@ def _fill_sell(st, ticker, shares, price, m, d, fx, why):
     st["trades"].append({"ticker": ticker, "market": m, "opened": p["opened"], "closed": d.isoformat(),
                          "shares": shares, "entry": round(p["cost"], 4), "exit": round(price, 4),
                          "pnl_hkd": round(pnl_local * fxm, 2), "pnl_pct": round(pnl_local / (p["cost"] * shares), 4),
-                         "why": why, "reason": p.get("reason", "")})
+                         "why": why, "reason": p.get("reason", ""), "id": len(st["trades"]) + 1,
+                         "setup": p.get("setup", "其他"), "ctx": p.get("ctx", {}), "order": p.get("order"),
+                         "r": round(pnl_local / (p["risk"] * shares), 2) if p.get("risk") else None})
     p["shares"] -= shares
     if p["shares"] <= 0:
         del st["positions"][ticker]
@@ -445,6 +455,8 @@ def build_view(final: dict, live: dict, entries: list[dict], bars: Bars, now: da
                  "stop": e.get("stop"), "target": e.get("target"), "reason": e.get("reason", "")}
                 for e in entries if e["type"] in ("cancel", "exit")][-20:][::-1]
     plans = [{"placed": hkt_str(e["t"]), "text": e["text"]} for e in entries if e["type"] == "plan"][-10:][::-1]
+    rv = learn.reviews(entries)
+    scored = [{**t, **learn.trade_extras(t, bars), "review": rv.get(t.get("id"), {}).get("text")} for t in live["trades"]]
     view = {"updated": hkt_str(now), "start": hkt_str(final["start"]), "capital": final["capital"],
             "fx": round(bars.fx(today), 4), "cash": round(live["cash"], 2), "equity": round(equity, 2),
             "ret": round(equity / final["capital"] - 1, 4), "bench": round(bench, 2) if bench else None,
@@ -452,7 +464,10 @@ def build_view(final: dict, live: dict, entries: list[dict], bars: Bars, now: da
             "invested": round(1 - live["cash"] / equity, 4) if equity else 0, "fees": round(live["fees"], 2),
             "positions": rows, "orders": orders, "controls": controls,
             "fills": [{**f, "name": nm.get(f["ticker"], f["ticker"])} for f in live["fills"][-60:][::-1]],
-            "trades": [{**t, "name": nm.get(t["ticker"], t["ticker"])} for t in live["trades"][-60:][::-1]],
+            "trades": [{**t, "name": nm.get(t["ticker"], t["ticker"])} for t in scored[-60:][::-1]],
+            "learn": {"overall": learn.overall(scored), "groups": learn.groups(scored),
+                      "diagnostics": learn.diagnostics(scored), "min_n": learn.MIN_N, "min_adopt": MIN_ADOPT},
+            "lessons": learn.fold_lessons(entries),
             "history": [[k, v["equity"], v["bench"]] for k, v in sorted(history.items())],
             "plans": plans, "stats": stats(live, history), "rules": RULES}
     return final, view
@@ -545,8 +560,23 @@ def _reason(r: str) -> str:
     return r
 
 
+def _context(ticker: str, ref: float, stop) -> dict:
+    """What the data said when the order was placed, so closed trades can be grouped later."""
+    m = market_of(ticker)
+    d = read_json(DOCS / STOCK_FILES[m], {})
+    st = d.get("stocks", {}).get(ticker, {})
+    th = next((t for t in d.get("themes", []) if t.get("theme") == st.get("theme")), {})
+    r = d.get("regime", {})
+    rnd = lambda v, n=2: None if v is None else round(v, n)
+    return {"market": m, "regime": r.get("label"), "regime_score": rnd(r.get("score"), 0),
+            "theme": st.get("theme"), "theme_verdict": th.get("verdict"), "short_score": rnd(st.get("short_score"), 0),
+            "long_score": rnd(st.get("long_score"), 0), "rsi": rnd(st.get("rsi"), 0), "ret5": rnd(st.get("ret5"), 4),
+            "ret20": rnd(st.get("ret20"), 4), "above_ma50": st.get("above_ma50"), "above_ma200": st.get("above_ma200"),
+            "earn_days": st.get("earn_days"), "stop_pct": rnd(stop / ref - 1, 4) if stop else None}
+
+
 def place_order(ticker: str, side: str, shares: int, limit=None, stop=None, target=None, days: int = 1,
-                reason: str = "") -> dict:
+                reason: str = "", setup: str = "其他") -> dict:
     view = read_json(VIEW, None)
     if view is None:
         raise SystemExit("未有 docs/paper.json,等 GitHub Actions 跑一次 update")
@@ -594,6 +624,11 @@ def place_order(ticker: str, side: str, shares: int, limit=None, stop=None, targ
             raise SystemExit(f"可以沽嘅只有 {have} 股")
         stop = target = None
     e = {"type": side, "ticker": ticker, "side": side, "shares": int(shares), "days": int(days), "reason": reason}
+    if side == "buy":
+        if setup not in SETUPS:
+            raise SystemExit(f"--setup 要係 {SETUPS} 其中之一")
+        e["setup"] = setup
+        e["ctx"] = _context(ticker, limit or close, stop)
     if m == "hk":
         e["lot"] = lot
     for k, v in (("limit", limit), ("stop", stop), ("target", target)):
@@ -634,6 +669,50 @@ def add_plan(text: str) -> dict:
     return _append({"type": "plan", "text": text.strip()})
 
 
+def add_review(trade_id: int, text: str) -> dict:
+    view = read_json(VIEW, {})
+    if not any(t.get("id") == trade_id for t in view.get("trades", [])):
+        raise SystemExit(f"冇第 {trade_id} 號已平倉交易")
+    entries = read_json(ORDERS, {"entries": []})["entries"]
+    if any(e["type"] == "review" and e["trade"] == trade_id for e in entries):
+        raise SystemExit(f"第 {trade_id} 號交易已經檢討過")
+    text = " ".join(text.split())
+    if not 10 <= len(text) <= MAX_REVIEW:
+        raise SystemExit(f"檢討要 10 至 {MAX_REVIEW} 字")
+    return _append({"type": "review", "trade": trade_id, "text": text})
+
+
+def add_lesson(text: str | None, evidence: list[int], status: str | None, lesson_id: str | None, note: str = "") -> dict:
+    view = read_json(VIEW, {})
+    known = {t.get("id") for t in view.get("trades", [])}
+    bad = [i for i in evidence if i not in known]
+    if bad:
+        raise SystemExit(f"證據入面有唔存在嘅交易:{bad}")
+    entries = read_json(ORDERS, {"entries": []})["entries"]
+    lessons = {L["id"]: L for L in learn.fold_lessons(entries)}
+    if status and status not in ("試行", "採用", "放棄"):
+        raise SystemExit("status 要係 試行 / 採用 / 放棄")
+    if lesson_id:
+        L = lessons.get(lesson_id)
+        if not L:
+            raise SystemExit(f"冇 {lesson_id} 呢條教訓")
+        if status == "採用" and len(set(L["evidence"]) | set(evidence)) < MIN_ADOPT:
+            raise SystemExit(f"要有最少 {MIN_ADOPT} 單已平倉交易做證據先可以採用(而家 {len(set(L['evidence']) | set(evidence))} 單)")
+        note = " ".join(note.split())
+        if not 4 <= len(note) <= MAX_LESSON:
+            raise SystemExit(f"--note 要 4 至 {MAX_LESSON} 字,講點解改")
+        return _append({"type": "lesson", "lesson": lesson_id, "status": status, "evidence": evidence, "note": note})
+    text = " ".join((text or "").split())
+    if not 8 <= len(text) <= MAX_LESSON:
+        raise SystemExit(f"教訓要 8 至 {MAX_LESSON} 字")
+    if status == "採用":
+        raise SystemExit("新教訓一定由 試行 開始")
+    active = [L for L in lessons.values() if L["status"] != "放棄"]
+    if len(active) >= 12:
+        raise SystemExit("已經有 12 條生效教訓,先放棄或者合併舊嘅")
+    return _append({"type": "lesson", "text": text, "status": "試行", "evidence": evidence, "note": note})
+
+
 def brief() -> str:
     v = read_json(VIEW, None)
     if v is None:
@@ -665,6 +744,32 @@ def brief() -> str:
     lines.append("\n## 已平倉")
     for t in v["trades"][:10]:
         lines.append(f"- {t['name']} {t['opened']}→{t['closed']} {pc(t['pnl_pct'])} {t['pnl_hkd']:+,.0f}港元 ({t['why']})")
+    todo = [t for t in v["trades"] if t.get("id") and not t.get("review")]
+    lines.append("\n## 未檢討嘅已平倉交易(每單都要寫 review)")
+    for t in todo:
+        c = t.get("ctx") or {}
+        lines.append(f"- 交易#{t['id']} {t['name']} {t['ticker']} {t.get('setup')} {t['opened']}→{t['closed']} "
+                     f"{pc(t['pnl_pct'])} R={t.get('r')} 平倉:{t['why']} 持有{t.get('held')}日 "
+                     f"最高曾賺{pc(t.get('mfe'))} 最多曾蝕{pc(t.get('mae'))} 平倉後5日{pc(t.get('after5'))} | "
+                     f"當時:型勢{c.get('regime')} 板塊{c.get('theme_verdict')} 短炒分{c.get('short_score')} "
+                     f"RSI{c.get('rsi')} 200天線上{c.get('above_ma200')} 業績{c.get('earn_days')}日 止蝕距離{pc(c.get('stop_pct'))} "
+                     f"| 買入理由:{t['reason']}")
+    if not todo:
+        lines.append("(冇)")
+    lines.append("\n## 教訓(採用 = 必須遵守;試行 = 優先考慮;要引用交易號做證據)")
+    for L in v.get("lessons", []):
+        if L["status"] != "放棄":
+            lines.append(f"- {L['id']} [{L['status']}] {L['text']} 證據:{L['evidence']}")
+    if not any(L["status"] != "放棄" for L in v.get("lessons", [])):
+        lines.append("(未有)")
+    lv = v.get("learn") or {}
+    if lv:
+        o = lv["overall"]
+        lines.append(f"\n## 學習統計(全部 {o['n']} 單:勝率 {o['win_rate']} 平均R {o['avg_r']} 盈虧比 {o['profit_factor']};"
+                     f"少過 {lv['min_n']} 單嘅組別一律當樣本唔夠)")
+        for g in lv["groups"]:
+            lines.append(f"- {g['dim']}={g['key']}: {g['n']}單 勝率{g['win_rate']} 平均R{g['avg_r']} t={g['t']} → {g['verdict']}")
+        lines += [f"- 檢查:{x}" for x in lv["diagnostics"]]
     now = datetime.now(UTC)
     nxt = {}
     for o, m, d in sessions(now, now + timedelta(days=10)):
@@ -689,6 +794,7 @@ def main(argv: list[str]) -> None:
     o.add_argument("--target", type=float)
     o.add_argument("--days", type=int, default=1)
     o.add_argument("--reason", required=True)
+    o.add_argument("--setup", choices=SETUPS, default="其他")
     c = sub.add_parser("cancel")
     c.add_argument("--id", type=int, required=True)
     c.add_argument("--reason", required=True)
@@ -700,6 +806,15 @@ def main(argv: list[str]) -> None:
     x.add_argument("--reason", required=True)
     p = sub.add_parser("plan")
     p.add_argument("--text-file", required=True)
+    rv = sub.add_parser("review")
+    rv.add_argument("--trade", type=int, required=True)
+    rv.add_argument("--text", required=True)
+    ls = sub.add_parser("lesson")
+    ls.add_argument("--id")
+    ls.add_argument("--text")
+    ls.add_argument("--status")
+    ls.add_argument("--evidence", default="")
+    ls.add_argument("--note", default="")
     a = ap.parse_args(argv)
     if a.cmd == "update":
         v = update()
@@ -708,7 +823,7 @@ def main(argv: list[str]) -> None:
     elif a.cmd == "brief":
         print(brief())
     elif a.cmd == "order":
-        e = place_order(a.ticker.upper(), a.side, a.shares, a.limit, a.stop, a.target, a.days, a.reason)
+        e = place_order(a.ticker.upper(), a.side, a.shares, a.limit, a.stop, a.target, a.days, a.reason, a.setup)
         print(f"order #{e['id']} placed {hkt_str(e['t'])} HKT: {e['side']} {e['shares']} {e['ticker']}")
     elif a.cmd == "cancel":
         e = cancel(a.id, a.reason)
@@ -716,6 +831,13 @@ def main(argv: list[str]) -> None:
     elif a.cmd == "exit":
         e = set_exit(a.ticker.upper(), a.stop, a.target, a.clear_target, a.reason)
         print(f"exit levels for {e['ticker']} recorded (#{e['id']})")
+    elif a.cmd == "review":
+        e = add_review(a.trade, a.text)
+        print(f"review of trade {a.trade} saved (#{e['id']})")
+    elif a.cmd == "lesson":
+        ev = [int(x) for x in a.evidence.split(",") if x.strip()]
+        e = add_lesson(a.text, ev, a.status, a.id, a.note)
+        print(f"lesson entry saved (#{e['id']})")
     else:
         e = add_plan(Path(a.text_file).read_text(encoding="utf-8"))
         print(f"plan note #{e['id']} saved")
