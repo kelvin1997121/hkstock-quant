@@ -26,5 +26,33 @@
    "V",
    "PM"
   ]
+ },
+ "2026-11-10": {
+  "regime_score": -34,
+  "label": "偏淡",
+  "short": [
+   "LLY",
+   "SBUX",
+   "MCD",
+   "HD",
+   "BRK-B",
+   "JNJ",
+   "XYZ",
+   "WMT",
+   "COST",
+   "ABBV"
+  ],
+  "long": [
+   "ABBV",
+   "MO",
+   "AAPL",
+   "CVX",
+   "JNJ",
+   "V",
+   "PFE",
+   "PM",
+   "XOM",
+   "COP"
+  ]
  }
 }
