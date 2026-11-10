@@ -104,6 +104,7 @@ button.tbtn{background:var(--chip);color:var(--ink);border:1px solid var(--borde
     <button role="tab" data-m="hk" aria-selected="true">港股</button>
     <button role="tab" data-m="us" aria-selected="false">美股</button>
     <button role="tab" data-m="hold" aria-selected="false">我的持倉</button>
+    <button role="tab" data-m="paper" aria-selected="false">模擬倉</button>
   </div>
   <div class="livebar" id="livebar"></div>
   <div id="mainview">
@@ -227,6 +228,40 @@ button.tbtn{background:var(--chip);color:var(--ink);border:1px solid var(--borde
     </div>
   </div>
 
+  <div id="paperview" hidden>
+    <div class="card">
+      <h2>Claude 模擬倉</h2>
+      <div class="sub">起始資金 10 萬港元(唔係真錢)。Claude 每個交易日 08:30 同 17:30 自己分析、自己落單買賣港股同美股。
+        單落咗之後要等下一個開市時段先成交,用真實開市價、最高同最低價計,費用按富途收費估算,冇得睇住結果先揀。只供參考,唔係投資建議。</div>
+      <div class="hsum" id="psum"></div>
+      <div class="legend"><span><i style="background:var(--s1)"></i>模擬倉資產</span><span><i style="background:var(--s2)"></i>基準:一半恒指、一半標普500</span></div>
+      <div id="pchart"></div>
+    </div>
+    <div class="card">
+      <h2>Claude 策略筆記 <span class="badge" id="pplant"></span></h2>
+      <div class="analysis" id="pplan"></div>
+      <div id="pplans"></div>
+    </div>
+    <div class="card">
+      <h2>持倉</h2>
+      <div class="scroll"><table id="ppos"></table></div>
+    </div>
+    <div class="card">
+      <h2>落單紀錄</h2>
+      <div class="scroll"><table id="pord"></table></div>
+      <div id="pctl"></div>
+    </div>
+    <div class="card">
+      <h2>已平倉交易</h2>
+      <div class="sub" id="pstats"></div>
+      <div class="scroll" style="margin-top:6px"><table id="ptr"></table></div>
+    </div>
+    <div class="card">
+      <h2>規則</h2>
+      <div class="sub" id="prules"></div>
+    </div>
+  </div>
+
   <footer>數據:Yahoo Finance(港股延遲約15分鐘)、東方財富(南向資金)、RTHK / 經濟通 / Google News。
   本頁只係數據分析工具,唔係投資建議;過往表現唔代表將來,投資有風險,自己決定自己負責。</footer>
 </div>
@@ -250,7 +285,7 @@ $("theme").onclick = () => {
   document.documentElement.dataset.theme = nxt; try { localStorage.setItem("theme", nxt); } catch(e){}
 };
 
-function lineChart(el, dates, s1, s2, name){
+function lineChart(el, dates, s1, s2, name, n2 = "50天線", tick = d => d.slice(2, 7)){
   const W = el.clientWidth || 600, H = 220, L = 46, R = 8, T = 8, B = 22;
   const vals = s1.concat(s2.filter(v => v!=null));
   let lo = Math.min(...vals), hi = Math.max(...vals); const pad = (hi-lo)*0.06; lo -= pad; hi += pad;
@@ -258,8 +293,8 @@ function lineChart(el, dates, s1, s2, name){
   const path = s => s.map((v,i) => v==null ? "" : `${i && s[i-1]!=null ? "L":"M"}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join("");
   let g = "";
   for (let k=0;k<=4;k++){ const v = lo + (hi-lo)*k/4; g += `<line x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}" stroke="var(--grid)"/><text x="${L-6}" y="${y(v)+4}" text-anchor="end">${Math.round(v).toLocaleString()}</text>`; }
-  for (let k=0;k<dates.length;k+=Math.ceil(dates.length/5)) g += `<text x="${x(k)}" y="${H-6}" text-anchor="middle">${dates[k].slice(2,7)}</text>`;
-  el.innerHTML = `<svg width="${W}" height="${H}" role="img" aria-label="${name}走勢及50天線">${g}
+  for (let k=0;k<dates.length;k+=Math.ceil(dates.length/5)) g += `<text x="${x(k)}" y="${H-6}" text-anchor="middle">${tick(dates[k])}</text>`;
+  el.innerHTML = `<svg width="${W}" height="${H}" role="img" aria-label="${name}走勢及${n2}">${g}
     <path d="${path(s2)}" fill="none" stroke="var(--s2)" stroke-width="2"/>
     <path d="${path(s1)}" fill="none" stroke="var(--s1)" stroke-width="2"/>
     <line id="xh" y1="${T}" y2="${H-B}" stroke="var(--axis)" style="display:none"/>
@@ -268,7 +303,7 @@ function lineChart(el, dates, s1, s2, name){
   const svg = el.querySelector("svg"), xh = svg.querySelector("#xh"), xd = svg.querySelector("#xd");
   svg.onmousemove = e => { const r = svg.getBoundingClientRect(); const i = Math.max(0, Math.min(dates.length-1, Math.round((e.clientX-r.left-L)/(W-L-R)*(dates.length-1))));
     xh.setAttribute("x1", x(i)); xh.setAttribute("x2", x(i)); xh.style.display=""; xd.setAttribute("cx", x(i)); xd.setAttribute("cy", y(s1[i])); xd.style.display="";
-    showTip(e, `<b>${dates[i]}</b><br>${name} ${num(s1[i],0)}<br>50天線 ${num(s2[i],0)}`); };
+    showTip(e, `<b>${dates[i]}</b><br>${name} ${num(s1[i],0)}<br>${n2} ${num(s2[i],0)}`); };
   svg.onmouseleave = () => { xh.style.display="none"; xd.style.display="none"; hideTip(); };
 }
 
@@ -589,6 +624,58 @@ function renderHoldings(){
     <div class="sub" style="margin-top:8px">分數 0-100 = 喺股票池入面排第幾(100 最強)。美股按 1 美元 = 7.8 港元計。以上只係數據整理,唔係買賣建議。</div>`;
 }
 
+// ---------------------------------------------------------------- simulated account (Claude trades HK$100k)
+const ORDER_STATUS = {pending: ["等緊成交", "wrn"], waiting: ["等開市", "wrn"], filled: ["已成交", "pos"],
+  expired: ["過期冇成交", ""], cancelled: ["已取消", ""], rejected: ["唔成功", "neg"]};
+function renderPaper(){
+  const p = DATA.paper;
+  if (!p) { $("upd").textContent = "載入中…"; return; }
+  $("upd").textContent = `模擬倉 · 成交數據更新 ${p.updated} HKT · 開始 ${p.start}`;
+  let eq = p.cash, live = 0;
+  const pos = p.positions.map(x => {
+    const q = LIVE[tcCode(x.ticker)], last = q ? q.price : x.last, fx = x.market === "us" ? p.fx : 1;
+    if (q) live++;
+    const val = last * x.shares * fx; eq += val;
+    return {...x, last, q, val, pnl: (last - x.cost) * x.shares * fx, pl: last / x.cost - 1};
+  });
+  const ret = eq / p.capital - 1, st = p.stats;
+  $("psum").innerHTML = `<div>資產淨值(港元)<b>${num(eq, 0)}</b></div>
+    <div>回報<b class="${cls(ret)}">${pct(ret, 2)}</b></div>
+    <div>基準同期<b class="${cls(p.bench_ret)}">${pct(p.bench_ret, 2)}</b></div>
+    <div>現金<b>${num(p.cash, 0)}</b></div><div>已投資<b>${eq ? ((1 - p.cash / eq) * 100).toFixed(0) : 0}%</b></div>
+    <div>已平倉<b>${st.trades} 筆${st.win_rate == null ? "" : ` · 勝率 ${(st.win_rate * 100).toFixed(0)}%`}</b></div>
+    <div>累計費用<b>${num(p.fees, 0)}</b></div>`;
+  const h = p.history;
+  if (h.length >= 2) lineChart($("pchart"), h.map(x => x[0]), h.map(x => x[1]), h.map(x => x[2]), "模擬倉", "基準", d => d.slice(5));
+  else $("pchart").innerHTML = `<div class="sub">有兩日或以上紀錄先畫走勢圖。</div>`;
+  const pl = p.plans;
+  $("pplant").textContent = pl.length ? pl[0].placed + " HKT" : ""; $("pplant").hidden = !pl.length;
+  $("pplan").textContent = pl.length ? pl[0].text : "Claude 未寫策略筆記(下一次 08:30 或 17:30 會寫)。";
+  $("pplans").innerHTML = pl.length > 1 ? `<details style="margin-top:8px"><summary class="sub">之前嘅筆記(${pl.length - 1})</summary>` +
+    pl.slice(1).map(x => `<div class="sub" style="margin-top:8px"><b>${esc(x.placed)}</b></div><div class="analysis">${esc(x.text)}</div>`).join("") + `</details>` : "";
+  $("ppos").innerHTML = pos.length ? `<tr><th>股票</th><th>股數</th><th>成本</th><th>現價</th><th>盈虧(港元)</th><th>市值(港元)</th><th>止蝕 / 目標</th><th>開倉</th><th class="l">買入理由</th></tr>` +
+    pos.map(x => `<tr><td>${esc(x.name)} <span class="sub">${esc(x.ticker)}</span></td><td>${num(x.shares, 0)}</td><td>${px(x.cost)}</td>
+      <td>${px(x.last)} ${x.q ? `<span class="${cls(x.q.pct / 100)}">${x.q.pct > 0 ? "+" : ""}${x.q.pct.toFixed(2)}%</span>` : `<span class="sub">${esc(x.last_date || "")}</span>`}</td>
+      <td class="${cls(x.pl)}">${num(x.pnl, 0)}(${pct(x.pl)})</td><td>${num(x.val, 0)}</td>
+      <td>${px(x.stop)} / ${px(x.target)}</td><td>${esc(x.opened)}</td><td class="l">${esc(x.reason)}</td></tr>`).join("")
+    : `<tr><td class="l sub">而家冇持倉,全部係現金。</td></tr>`;
+  $("pord").innerHTML = p.orders.length ? `<tr><th>落單時間</th><th>#</th><th>買/沽</th><th>股票</th><th>股數</th><th>價格</th><th>止蝕 / 目標</th><th>狀態</th><th class="l">理由</th></tr>` +
+    p.orders.map(o => { const [s, c] = ORDER_STATUS[o.status] || [o.status, ""];
+      return `<tr><td>${esc(o.placed)}</td><td>${o.id}</td><td class="${o.side === "buy" ? "pos" : "neg"}">${o.side === "buy" ? "買" : "沽"}</td>
+        <td>${esc(o.name)} <span class="sub">${esc(o.ticker)}</span></td><td>${num(o.shares, 0)}</td><td>${o.limit ? "限價 " + px(o.limit) : "開市價"}</td>
+        <td>${o.side === "buy" ? px(o.stop) + " / " + px(o.target) : "–"}</td><td class="${c}">${s}${o.note ? `<div class="sub">${esc(o.note)}</div>` : ""}</td>
+        <td class="l">${esc(o.reason)}</td></tr>`; }).join("")
+    : `<tr><td class="l sub">未有落單。</td></tr>`;
+  $("pctl").innerHTML = p.controls.length ? `<div class="sub" style="margin-top:8px">改止蝕/目標及取消:` +
+    p.controls.map(c => `${esc(c.placed)} ${c.type === "cancel" ? `取消 #${c.order}` : `${esc(c.ticker)} 止蝕 ${px(c.stop)} 目標 ${px(c.target)}`}(${esc(c.reason)})`).join(";") + `</div>` : "";
+  $("pstats").textContent = st.trades ? `已實現盈虧 ${num(st.realised, 0)} 港元 · 平均賺 ${pct(st.avg_win)} · 平均蝕 ${pct(st.avg_loss)}` +
+    ` · 盈虧比 ${st.profit_factor ?? "–"} · 最大回撤 ${pct(st.max_drawdown)}` : `未有平倉交易。最大回撤 ${pct(st.max_drawdown)}`;
+  $("ptr").innerHTML = p.trades.length ? `<tr><th>股票</th><th>開倉 → 平倉</th><th>股數</th><th>成本</th><th>賣出</th><th>盈虧(港元)</th><th>點樣平倉</th><th class="l">當初買入理由</th></tr>` +
+    p.trades.map(t => `<tr><td>${esc(t.name)} <span class="sub">${esc(t.ticker)}</span></td><td>${esc(t.opened)} → ${esc(t.closed)}</td><td>${num(t.shares, 0)}</td>
+      <td>${px(t.entry)}</td><td>${px(t.exit)}</td><td class="${cls(t.pnl_hkd)}">${num(t.pnl_hkd, 0)}(${pct(t.pnl_pct)})</td><td>${esc(t.why)}</td><td class="l">${esc(t.reason)}</td></tr>`).join("") : "";
+  $("prules").textContent = p.rules + ` 成本已包括買入費用;美股按 1 美元 = ${p.fx} 港元計;股息唔計。即時價只影響呢頁顯示,成交以分析更新時嘅 Yahoo 價為準。`;
+}
+
 // ---------------------------------------------------------------- live quotes (Tencent, every 30 s)
 // Prices only: scores, regime and levels still come from the last analysis run (every 15 min in session).
 const LIVE = {}, PICK = {};
@@ -614,6 +701,7 @@ async function fetchLive(codes){
 function liveCodes(){
   const c = [];
   if (view === "hold") parseHoldings($("hin").value).forEach(h => c.push(tcCode(h.ticker)));
+  else if (view === "paper") (DATA.paper?.positions || []).forEach(x => c.push(tcCode(x.ticker)));
   else {
     (LIVE_IDX[view] || []).forEach(x => c.push(x[0]));
     const d = DATA[view];
@@ -628,12 +716,13 @@ async function liveTick(){
   catch (e) { liveErr = true; }
   applyLive();
   if (view === "hold") renderHoldings();
+  if (view === "paper") renderPaper();
 }
 function applyLive(){
-  if (DATA[view]) checkStale(DATA[view]);
+  if ((view === "hk" || view === "us") && DATA[view]) checkStale(DATA[view]);
   const bar = $("livebar");
   if (liveErr && !liveAt) { bar.innerHTML = `<span class="sub">即時報價暫時取唔到,顯示最後分析數字</span>`; return; }
-  const idx = view === "hold" ? [LIVE_IDX.hk[0], LIVE_IDX.us[0]] : (LIVE_IDX[view] || []);
+  const idx = view === "hold" || view === "paper" ? [LIVE_IDX.hk[0], LIVE_IDX.us[0]] : (LIVE_IDX[view] || []);
   bar.innerHTML = (liveAt ? `<span><span class="livedot"></span>即時 ${liveAt.toLocaleTimeString("en-GB")}</span>` : "") +
     idx.map(([code, name]) => { const q = LIVE[code]; return q ? `<span>${name} <b>${num(q.price, 0)}</b> <span class="${cls(q.pct / 100)}">${q.pct > 0 ? "+" : ""}${q.pct.toFixed(2)}%</span></span>` : ""; }).join("") +
     `<span class="sub">分析數字每 15 分鐘更新</span>`;
@@ -663,12 +752,14 @@ document.addEventListener("visibilitychange", () => { if (!document.hidden) live
 const DATA = {};
 let view = "hk";
 try { view = location.hash.slice(1) || localStorage.getItem("view") || "hk"; } catch(e){}
-if (!["hk","us","hold"].includes(view)) view = "hk";
+if (!["hk","us","hold","paper"].includes(view)) view = "hk";
 function show(v){
   view = v; try { localStorage.setItem("view", v); history.replaceState(null, "", "#" + v); } catch(e){}
   document.querySelectorAll(".tabs button").forEach(b => b.setAttribute("aria-selected", String(b.dataset.m === v)));
-  $("mainview").hidden = v === "hold"; $("holdview").hidden = v !== "hold";
+  $("mainview").hidden = v === "hold" || v === "paper"; $("holdview").hidden = v !== "hold"; $("paperview").hidden = v !== "paper";
+  if (v !== "hk" && v !== "us") $("stale").hidden = true;
   if (v === "hold") { $("upd").textContent = "持倉分析(用港股同美股最新數據)"; renderHoldings(); }
+  else if (v === "paper") { renderPaper(); applyLive(); }
   else if (DATA[v]) { render(DATA[v]); applyLive(); }
   else $("upd").textContent = "載入中…";
 }
@@ -678,7 +769,7 @@ $("hclear").onclick = () => { $("hin").value = ""; renderHoldings(); };
 try { $("hin").value = localStorage.getItem("holdings") || ""; } catch(e){}
 const load = (k, f) => fetch(f + "?t=" + Date.now()).then(r => r.json()).then(d => { DATA[k] = d; if (view === k || view === "hold" || k === "ai") show(view); if (k === view || (view === "hold" && k !== "ai")) liveTick(); })
   .catch(e => { if (view === k) $("upd").textContent = "載入數據失敗:" + e; });
-load("hk", "data.json"); load("us", "us.json"); load("ai", "ai.json");
+load("hk", "data.json"); load("us", "us.json"); load("ai", "ai.json"); load("paper", "paper.json");
 try { $("pv").value = localStorage.getItem("pv") || ""; $("rp").value = localStorage.getItem("rp") || ""; } catch(e){}
 ["pv", "rp"].forEach(id => $(id).oninput = () => { try { localStorage.setItem(id, $(id).value); } catch(e){} if (DATA[view]) render(DATA[view]); });
 show(view);

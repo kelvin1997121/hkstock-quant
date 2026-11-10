@@ -73,6 +73,12 @@ jobs:
         # scheduled and ticker runs: only the market(s) in session; manual run: both unless chosen
         run: python -m hkstock --market ${{ github.event_name == 'schedule' && 'auto' || inputs.market || 'all' }}
 
+      - name: Simulated account (fill Claude's orders at real prices)
+        continue-on-error: true
+        env:
+          PYTHONIOENCODING: utf-8
+        run: python -m hkstock.paper update || { echo "::warning::simulated account update failed"; exit 1; }
+
       - name: Restore alert state
         uses: actions/cache/restore@v6
         with:
