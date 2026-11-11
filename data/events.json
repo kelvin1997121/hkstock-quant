@@ -407,12 +407,12 @@
 "ABBV": {
 "earnings": "2026-10-30",
 "ex_div": "2027-01-15",
-"fetched": "2026-11-10"
+"fetched": "2026-11-11"
 },
 "AEM": {
 "earnings": "2026-10-28",
 "ex_div": "2026-12-01",
-"fetched": "2026-11-10"
+"fetched": "2026-11-11"
 },
 "AMAT": {
 "earnings": "2026-11-13",
@@ -427,12 +427,12 @@
 "AMZN": {
 "earnings": "2026-10-29",
 "ex_div": null,
-"fetched": "2026-11-10"
+"fetched": "2026-11-11"
 },
 "ANET": {
 "earnings": "2026-11-03",
 "ex_div": null,
-"fetched": "2026-11-10"
+"fetched": "2026-11-11"
 },
 "ARM": {
 "earnings": "2027-02-04",
@@ -470,9 +470,9 @@
 "fetched": "2026-11-09"
 },
 "BRK-B": {
-"earnings": "2026-11-10",
+"earnings": "2026-11-09",
 "ex_div": null,
-"fetched": "2026-11-09"
+"fetched": "2026-11-11"
 },
 "BTC-USD": {
 "earnings": null,
@@ -487,7 +487,7 @@
 "CEG": {
 "earnings": "2026-11-09",
 "ex_div": "2026-11-16",
-"fetched": "2026-11-10"
+"fetched": "2026-11-11"
 },
 "CIEN": {
 "earnings": "2026-12-10",
@@ -502,7 +502,7 @@
 "COIN": {
 "earnings": "2026-10-29",
 "ex_div": null,
-"fetched": "2026-11-10"
+"fetched": "2026-11-11"
 },
 "COP": {
 "earnings": "2027-02-04",
@@ -542,7 +542,7 @@
 "GOOGL": {
 "earnings": "2026-10-28",
 "ex_div": "2026-12-07",
-"fetched": "2026-11-10"
+"fetched": "2026-11-11"
 },
 "GS": {
 "earnings": "2027-01-19",
@@ -557,7 +557,7 @@
 "HOOD": {
 "earnings": "2026-10-27",
 "ex_div": null,
-"fetched": "2026-11-10"
+"fetched": "2026-11-11"
 },
 "INTC": {
 "earnings": "2027-01-29",
@@ -567,7 +567,7 @@
 "IONQ": {
 "earnings": "2026-11-05",
 "ex_div": null,
-"fetched": "2026-11-10"
+"fetched": "2026-11-11"
 },
 "JD": {
 "earnings": "2026-11-17",
@@ -592,7 +592,7 @@
 "LLY": {
 "earnings": "2026-10-29",
 "ex_div": "2026-11-13",
-"fetched": "2026-11-10"
+"fetched": "2026-11-11"
 },
 "LMT": {
 "earnings": "2027-01-26",
@@ -612,7 +612,7 @@
 "MCD": {
 "earnings": "2026-11-04",
 "ex_div": "2026-12-01",
-"fetched": "2026-11-10"
+"fetched": "2026-11-11"
 },
 "META": {
 "earnings": "2027-01-28",
@@ -627,7 +627,7 @@
 "MRK": {
 "earnings": "2026-10-29",
 "ex_div": "2026-09-15",
-"fetched": "2026-11-10"
+"fetched": "2026-11-11"
 },
 "MRVL": {
 "earnings": "2026-12-02",
@@ -647,7 +647,7 @@
 "MSTR": {
 "earnings": "2026-10-29",
 "ex_div": null,
-"fetched": "2026-11-10"
+"fetched": "2026-11-11"
 },
 "MU": {
 "earnings": "2026-12-24",
@@ -662,7 +662,7 @@
 "NEM": {
 "earnings": "2026-10-22",
 "ex_div": "2026-11-25",
-"fetched": "2026-11-10"
+"fetched": "2026-11-11"
 },
 "NFLX": {
 "earnings": "2027-01-20",
@@ -707,7 +707,7 @@
 "OKLO": {
 "earnings": "2026-11-06",
 "ex_div": null,
-"fetched": "2026-11-10"
+"fetched": "2026-11-11"
 },
 "ORCL": {
 "earnings": "2026-12-15",
@@ -715,9 +715,9 @@
 "fetched": "2026-11-09"
 },
 "OXY": {
-"earnings": "2026-11-10",
+"earnings": "2026-11-09",
 "ex_div": "2026-12-10",
-"fetched": "2026-11-09"
+"fetched": "2026-11-11"
 },
 "PANW": {
 "earnings": "2026-11-19",
@@ -742,17 +742,17 @@
 "PM": {
 "earnings": "2026-10-21",
 "ex_div": "2026-10-02",
-"fetched": "2026-11-10"
+"fetched": "2026-11-11"
 },
 "PYPL": {
 "earnings": "2026-10-27",
 "ex_div": "2026-12-04",
-"fetched": "2026-11-10"
+"fetched": "2026-11-11"
 },
 "QBTS": {
 "earnings": "2026-11-10",
 "ex_div": null,
-"fetched": "2026-11-09"
+"fetched": "2026-11-11"
 },
 "QCOM": {
 "earnings": "2027-02-04",
@@ -767,12 +767,12 @@
 "RIVN": {
 "earnings": "2026-10-29",
 "ex_div": null,
-"fetched": "2026-11-10"
+"fetched": "2026-11-11"
 },
 "RKLB": {
-"earnings": "2026-11-10",
+"earnings": "2026-11-09",
 "ex_div": null,
-"fetched": "2026-11-09"
+"fetched": "2026-11-11"
 },
 "RTX": {
 "earnings": "2027-01-26",
@@ -792,7 +792,7 @@
 "SMR": {
 "earnings": "2026-11-05",
 "ex_div": null,
-"fetched": "2026-11-10"
+"fetched": "2026-11-11"
 },
 "SNOW": {
 "earnings": "2026-12-03",
@@ -802,7 +802,7 @@
 "SPCX": {
 "earnings": "2026-10-20",
 "ex_div": null,
-"fetched": "2026-11-10"
+"fetched": "2026-11-11"
 },
 "TME": {
 "earnings": "2026-11-17",
@@ -842,7 +842,7 @@
 "VST": {
 "earnings": "2026-11-06",
 "ex_div": "2026-12-22",
-"fetched": "2026-11-10"
+"fetched": "2026-11-11"
 },
 "WFC": {
 "earnings": "2027-01-14",
@@ -857,7 +857,7 @@
 "WPM": {
 "earnings": "2026-11-05",
 "ex_div": "2026-11-19",
-"fetched": "2026-11-10"
+"fetched": "2026-11-11"
 },
 "XOM": {
 "earnings": "2027-01-29",
@@ -867,6 +867,6 @@
 "XYZ": {
 "earnings": "2026-11-03",
 "ex_div": null,
-"fetched": "2026-11-10"
+"fetched": "2026-11-11"
 }
 }
