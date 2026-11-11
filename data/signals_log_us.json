@@ -54,5 +54,33 @@
    "XOM",
    "COP"
   ]
+ },
+ "2026-11-11": {
+  "regime_score": -14,
+  "label": "震盪",
+  "short": [
+   "LLY",
+   "RKLB",
+   "COST",
+   "BRK-B",
+   "TME",
+   "ABBV",
+   "MCD",
+   "JNJ",
+   "HD",
+   "SBUX"
+  ],
+  "long": [
+   "ABBV",
+   "MO",
+   "AAPL",
+   "CVX",
+   "JNJ",
+   "PFE",
+   "PM",
+   "XOM",
+   "V",
+   "COP"
+  ]
  }
 }
