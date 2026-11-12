@@ -82,5 +82,33 @@
    "V",
    "COP"
   ]
+ },
+ "2026-11-12": {
+  "regime_score": -9,
+  "label": "震盪",
+  "short": [
+   "JNJ",
+   "COST",
+   "BRK-B",
+   "ANET",
+   "AMD",
+   "WMT",
+   "LLY",
+   "RKLB",
+   "TME",
+   "TSLA"
+  ],
+  "long": [
+   "MO",
+   "ABBV",
+   "MRK",
+   "JNJ",
+   "CVX",
+   "AAPL",
+   "XOM",
+   "PFE",
+   "PM",
+   "V"
+  ]
  }
 }
