@@ -3,7 +3,7 @@
 # the tests workflow runs on it, and it is merged by hand only when the tests pass.
 yfinance>=1.8,<2
 pandas>=2.2,<4
-numpy>=1.26,<3
+numpy>=2.5.4,<3
 requests>=2.31,<3
 feedparser>=6.0,<7
 anthropic>=2.4,<3
