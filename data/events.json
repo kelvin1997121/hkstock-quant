@@ -1,872 +1,1220 @@
 {
 "0001.HK": {
-"earnings": "2026-08-13",
+"earnings": "2027-03-18",
+"earnings_est": false,
 "ex_div": "2026-09-14",
-"fetched": "2026-11-12"
+"fetched": "2026-11-12",
+"v": 2
 },
 "0002.HK": {
-"earnings": null,
+"earnings": "2027-02-25",
+"earnings_est": false,
 "ex_div": "2026-12-02",
-"fetched": "2026-11-09"
+"fetched": "2026-11-12",
+"v": 2
 },
 "0003.HK": {
-"earnings": "2026-08-18",
+"earnings": "2027-03-19",
+"earnings_est": false,
 "ex_div": "2026-08-31",
-"fetched": "2026-11-12"
+"fetched": "2026-11-12",
+"v": 2
 },
 "0005.HK": {
-"earnings": "2026-10-27",
+"earnings": "2027-02-23",
+"earnings_est": false,
 "ex_div": "2026-11-05",
-"fetched": "2026-11-12"
+"fetched": "2026-11-12",
+"v": 2
 },
 "0006.HK": {
-"earnings": null,
+"earnings": "2027-03-17",
+"earnings_est": false,
 "ex_div": "2026-09-09",
-"fetched": "2026-11-12"
+"fetched": "2026-11-12",
+"v": 2
 },
 "0012.HK": {
-"earnings": "2026-08-20",
+"earnings": "2027-03-23",
+"earnings_est": false,
 "ex_div": "2026-09-03",
-"fetched": "2026-11-12"
+"fetched": "2026-11-12",
+"v": 2
 },
 "0016.HK": {
-"earnings": "2026-09-10",
+"earnings": "2027-03-04",
+"earnings_est": false,
 "ex_div": "2026-11-10",
-"fetched": "2026-11-12"
+"fetched": "2026-11-12",
+"v": 2
 },
 "0020.HK": {
-"earnings": "2026-08-26",
+"earnings": "2027-03-23",
+"earnings_est": false,
 "ex_div": null,
-"fetched": "2026-11-12"
+"fetched": "2026-11-12",
+"v": 2
 },
 "0175.HK": {
-"earnings": "2026-08-17",
+"earnings": "2027-03-18",
+"earnings_est": false,
 "ex_div": "2026-06-12",
-"fetched": "2026-11-12"
+"fetched": "2026-11-12",
+"v": 2
 },
 "0285.HK": {
-"earnings": "2026-08-28",
+"earnings": "2027-03-31",
+"earnings_est": false,
 "ex_div": "2026-06-11",
-"fetched": "2026-11-12"
+"fetched": "2026-11-12",
+"v": 2
 },
 "0291.HK": {
-"earnings": "2026-08-19",
+"earnings": "2027-03-23",
+"earnings_est": false,
 "ex_div": "2026-09-01",
-"fetched": "2026-11-12"
+"fetched": "2026-11-12",
+"v": 2
 },
 "0316.HK": {
 "earnings": null,
+"earnings_est": false,
 "ex_div": "2026-09-10",
-"fetched": "2026-11-09"
+"fetched": "2026-11-12",
+"v": 2
 },
 "0358.HK": {
-"earnings": "2026-10-28",
+"earnings": "2027-03-25",
+"earnings_est": false,
 "ex_div": "2026-06-11",
-"fetched": "2026-11-12"
+"fetched": "2026-11-12",
+"v": 2
 },
 "0386.HK": {
-"earnings": "2026-10-29",
+"earnings": "2027-03-22",
+"earnings_est": false,
 "ex_div": "2026-09-21",
-"fetched": "2026-11-12"
+"fetched": "2026-11-12",
+"v": 2
 },
 "0388.HK": {
-"earnings": "2026-11-06",
+"earnings": "2027-02-24",
+"earnings_est": false,
 "ex_div": "2026-09-01",
-"fetched": "2026-11-12"
+"fetched": "2026-11-12",
+"v": 2
 },
 "0669.HK": {
-"earnings": null,
+"earnings": "2027-03-02",
+"earnings_est": false,
 "ex_div": "2026-09-01",
-"fetched": "2026-11-09"
+"fetched": "2026-11-12",
+"v": 2
 },
 "0688.HK": {
-"earnings": "2026-08-26",
+"earnings": "2027-03-31",
+"earnings_est": false,
 "ex_div": "2026-09-16",
-"fetched": "2026-11-12"
+"fetched": "2026-11-12",
+"v": 2
 },
 "0700.HK": {
 "earnings": "2026-11-18",
+"earnings_est": false,
 "ex_div": "2026-05-15",
-"fetched": "2026-11-09"
+"fetched": "2026-11-12",
+"v": 2
 },
 "0728.HK": {
-"earnings": "2026-08-20",
+"earnings": "2027-03-30",
+"earnings_est": false,
 "ex_div": "2026-09-02",
-"fetched": "2026-11-12"
+"fetched": "2026-11-12",
+"v": 2
 },
 "0762.HK": {
-"earnings": "2026-10-29",
+"earnings": "2027-03-18",
+"earnings_est": false,
 "ex_div": "2026-06-03",
-"fetched": "2026-11-12"
+"fetched": "2026-11-12",
+"v": 2
 },
 "0817.HK": {
-"earnings": "2026-08-25",
+"earnings": "2027-03-23",
+"earnings_est": false,
 "ex_div": "2026-09-16",
-"fetched": "2026-11-12"
+"fetched": "2026-11-12",
+"v": 2
 },
 "0823.HK": {
 "earnings": "2026-11-12",
+"earnings_est": false,
 "ex_div": "2026-06-11",
-"fetched": "2026-11-09"
+"fetched": "2026-11-12",
+"v": 2
 },
 "0857.HK": {
-"earnings": "2026-10-28",
+"earnings": "2027-03-25",
+"earnings_est": false,
 "ex_div": "2026-09-10",
-"fetched": "2026-11-12"
+"fetched": "2026-11-12",
+"v": 2
 },
 "0883.HK": {
-"earnings": "2026-08-26",
+"earnings": "2027-03-25",
+"earnings_est": false,
 "ex_div": "2026-09-10",
-"fetched": "2026-11-12"
+"fetched": "2026-11-12",
+"v": 2
 },
 "0939.HK": {
-"earnings": "2026-10-30",
+"earnings": "2027-03-29",
+"earnings_est": false,
 "ex_div": "2026-12-03",
-"fetched": "2026-11-12"
+"fetched": "2026-11-12",
+"v": 2
 },
 "0941.HK": {
-"earnings": "2026-10-20",
+"earnings": "2027-03-25",
+"earnings_est": false,
 "ex_div": "2026-08-25",
-"fetched": "2026-11-12"
+"fetched": "2026-11-12",
+"v": 2
 },
 "0960.HK": {
-"earnings": "2026-08-28",
+"earnings": "2027-04-01",
+"earnings_est": false,
 "ex_div": "2026-03-16",
-"fetched": "2026-11-12"
+"fetched": "2026-11-12",
+"v": 2
 },
 "0981.HK": {
 "earnings": "2026-11-12",
+"earnings_est": false,
 "ex_div": null,
-"fetched": "2026-11-09"
+"fetched": "2026-11-12",
+"v": 2
 },
 "0992.HK": {
 "earnings": "2026-11-19",
+"earnings_est": false,
 "ex_div": "2026-08-05",
-"fetched": "2026-11-09"
+"fetched": "2026-11-12",
+"v": 2
 },
 "1024.HK": {
 "earnings": "2026-11-19",
+"earnings_est": false,
 "ex_div": "2026-06-29",
-"fetched": "2026-11-09"
+"fetched": "2026-11-12",
+"v": 2
 },
 "1088.HK": {
-"earnings": "2026-10-23",
+"earnings": "2027-03-29",
+"earnings_est": false,
 "ex_div": "2026-10-08",
-"fetched": "2026-11-12"
+"fetched": "2026-11-12",
+"v": 2
 },
 "1093.HK": {
 "earnings": "2026-11-18",
+"earnings_est": false,
 "ex_div": "2026-10-20",
-"fetched": "2026-11-09"
+"fetched": "2026-11-12",
+"v": 2
 },
 "1109.HK": {
-"earnings": "2026-08-31",
+"earnings": "2027-03-25",
+"earnings_est": false,
 "ex_div": "2026-09-10",
-"fetched": "2026-11-12"
+"fetched": "2026-11-12",
+"v": 2
 },
 "1113.HK": {
-"earnings": "2026-08-13",
+"earnings": "2027-03-18",
+"earnings_est": false,
 "ex_div": "2026-09-14",
-"fetched": "2026-11-12"
+"fetched": "2026-11-12",
+"v": 2
 },
 "1171.HK": {
-"earnings": "2026-10-30",
+"earnings": "2027-04-01",
+"earnings_est": false,
 "ex_div": "2026-09-10",
-"fetched": "2026-11-12"
+"fetched": "2026-11-12",
+"v": 2
 },
 "1177.HK": {
-"earnings": "2026-08-19",
+"earnings": "2027-03-25",
+"earnings_est": false,
 "ex_div": "2026-09-01",
-"fetched": "2026-11-12"
+"fetched": "2026-11-12",
+"v": 2
 },
 "1208.HK": {
-"earnings": null,
+"earnings": "2027-03-02",
+"earnings_est": false,
 "ex_div": "2014-05-23",
-"fetched": "2026-11-11"
+"fetched": "2026-11-12",
+"v": 2
 },
 "1211.HK": {
-"earnings": "2026-10-29",
+"earnings": "2027-04-01",
+"earnings_est": false,
 "ex_div": "2026-06-11",
-"fetched": "2026-11-12"
+"fetched": "2026-11-12",
+"v": 2
 },
 "1299.HK": {
-"earnings": "2026-08-19",
+"earnings": "2027-03-18",
+"earnings_est": false,
 "ex_div": "2026-09-04",
-"fetched": "2026-11-12"
+"fetched": "2026-11-12",
+"v": 2
 },
 "1347.HK": {
-"earnings": "2026-11-05",
+"earnings": "2027-02-11",
+"earnings_est": false,
 "ex_div": "2024-06-03",
-"fetched": "2026-11-12"
+"fetched": "2026-11-12",
+"v": 2
 },
 "1398.HK": {
-"earnings": "2026-10-30",
+"earnings": "2027-03-16",
+"earnings_est": false,
 "ex_div": "2026-10-09",
-"fetched": "2026-11-12"
+"fetched": "2026-11-12",
+"v": 2
 },
 "1801.HK": {
-"earnings": "2026-08-25",
+"earnings": "2027-03-25",
+"earnings_est": false,
 "ex_div": null,
-"fetched": "2026-11-12"
+"fetched": "2026-11-12",
+"v": 2
 },
 "1810.HK": {
 "earnings": "2026-11-24",
+"earnings_est": false,
 "ex_div": null,
-"fetched": "2026-11-09"
+"fetched": "2026-11-12",
+"v": 2
 },
 "1818.HK": {
-"earnings": "2026-10-15",
+"earnings": "2027-03-22",
+"earnings_est": false,
 "ex_div": "2026-06-03",
-"fetched": "2026-11-12"
+"fetched": "2026-11-12",
+"v": 2
 },
 "1919.HK": {
-"earnings": "2026-08-28",
+"earnings": "2027-03-18",
+"earnings_est": false,
 "ex_div": "2026-09-23",
-"fetched": "2026-11-12"
+"fetched": "2026-11-12",
+"v": 2
 },
 "1929.HK": {
 "earnings": "2026-11-24",
+"earnings_est": false,
 "ex_div": "2026-08-05",
-"fetched": "2026-11-09"
+"fetched": "2026-11-12",
+"v": 2
 },
 "2015.HK": {
 "earnings": "2026-11-25",
+"earnings_est": false,
 "ex_div": null,
-"fetched": "2026-11-09"
+"fetched": "2026-11-12",
+"v": 2
 },
 "2020.HK": {
-"earnings": "2026-08-26",
+"earnings": "2027-03-24",
+"earnings_est": false,
 "ex_div": "2026-09-08",
-"fetched": "2026-11-12"
+"fetched": "2026-11-12",
+"v": 2
 },
 "2202.HK": {
-"earnings": "2026-10-29",
+"earnings": "2027-04-07",
+"earnings_est": false,
 "ex_div": "2023-07-14",
-"fetched": "2026-11-12"
+"fetched": "2026-11-12",
+"v": 2
 },
 "2252.HK": {
 "earnings": null,
+"earnings_est": false,
 "ex_div": null,
-"fetched": "2026-11-09"
+"fetched": "2026-11-12",
+"v": 2
 },
 "2269.HK": {
-"earnings": "2026-08-25",
+"earnings": "2027-03-30",
+"earnings_est": false,
 "ex_div": null,
-"fetched": "2026-11-12"
+"fetched": "2026-11-12",
+"v": 2
 },
 "2318.HK": {
-"earnings": "2026-10-28",
+"earnings": "2027-03-25",
+"earnings_est": false,
 "ex_div": "2026-09-02",
-"fetched": "2026-11-12"
+"fetched": "2026-11-12",
+"v": 2
 },
 "2331.HK": {
-"earnings": "2026-08-20",
+"earnings": "2027-03-18",
+"earnings_est": false,
 "ex_div": "2026-11-18",
-"fetched": "2026-11-12"
+"fetched": "2026-11-12",
+"v": 2
 },
 "2333.HK": {
-"earnings": "2026-10-30",
+"earnings": "2027-04-08",
+"earnings_est": false,
 "ex_div": "2026-07-02",
-"fetched": "2026-11-12"
+"fetched": "2026-11-12",
+"v": 2
 },
 "2359.HK": {
-"earnings": "2026-10-26",
+"earnings": "2027-03-22",
+"earnings_est": false,
 "ex_div": "2026-08-18",
-"fetched": "2026-11-12"
+"fetched": "2026-11-12",
+"v": 2
 },
 "2382.HK": {
-"earnings": "2026-08-26",
+"earnings": "2027-04-01",
+"earnings_est": false,
 "ex_div": "2026-06-05",
-"fetched": "2026-11-12"
+"fetched": "2026-11-12",
+"v": 2
 },
 "2388.HK": {
-"earnings": "2026-10-30",
+"earnings": "2027-03-30",
+"earnings_est": false,
 "ex_div": "2026-11-12",
-"fetched": "2026-11-12"
+"fetched": "2026-11-12",
+"v": 2
 },
 "2600.HK": {
-"earnings": "2026-10-29",
+"earnings": "2027-03-25",
+"earnings_est": false,
 "ex_div": "2026-09-09",
-"fetched": "2026-11-12"
+"fetched": "2026-11-12",
+"v": 2
 },
 "2618.HK": {
 "earnings": "2026-11-17",
+"earnings_est": false,
 "ex_div": null,
-"fetched": "2026-11-09"
+"fetched": "2026-11-12",
+"v": 2
 },
 "2628.HK": {
-"earnings": "2026-10-30",
+"earnings": "2027-03-24",
+"earnings_est": false,
 "ex_div": "2026-10-08",
-"fetched": "2026-11-12"
+"fetched": "2026-11-12",
+"v": 2
 },
 "2888.HK": {
-"earnings": "2026-10-28",
+"earnings": "2027-02-19",
+"earnings_est": false,
 "ex_div": "2026-08-06",
-"fetched": "2026-11-12"
+"fetched": "2026-11-12",
+"v": 2
 },
 "2899.HK": {
-"earnings": "2026-10-23",
+"earnings": "2027-03-25",
+"earnings_est": false,
 "ex_div": "2026-07-23",
-"fetched": "2026-11-12"
+"fetched": "2026-11-12",
+"v": 2
 },
 "3690.HK": {
 "earnings": "2026-11-26",
+"earnings_est": false,
 "ex_div": null,
-"fetched": "2026-11-09"
+"fetched": "2026-11-12",
+"v": 2
 },
 "3988.HK": {
-"earnings": "2026-10-30",
+"earnings": "2027-03-30",
+"earnings_est": false,
 "ex_div": "2026-12-02",
-"fetched": "2026-11-12"
+"fetched": "2026-11-12",
+"v": 2
 },
 "3993.HK": {
-"earnings": "2026-10-23",
+"earnings": "2027-04-01",
+"earnings_est": false,
 "ex_div": "2026-09-01",
-"fetched": "2026-11-12"
+"fetched": "2026-11-12",
+"v": 2
 },
 "6160.HK": {
-"earnings": "2026-11-05",
+"earnings": "2027-02-25",
+"earnings_est": false,
 "ex_div": null,
-"fetched": "2026-11-12"
+"fetched": "2026-11-12",
+"v": 2
 },
 "6181.HK": {
-"earnings": "2026-08-25",
+"earnings": "2027-03-31",
+"earnings_est": false,
 "ex_div": "2026-11-27",
-"fetched": "2026-11-12"
+"fetched": "2026-11-12",
+"v": 2
 },
 "6682.HK": {
 "earnings": null,
+"earnings_est": false,
 "ex_div": null,
-"fetched": "2026-11-09"
+"fetched": "2026-11-12",
+"v": 2
 },
 "6862.HK": {
-"earnings": "2026-08-25",
+"earnings": "2027-03-23",
+"earnings_est": false,
 "ex_div": "2026-09-07",
-"fetched": "2026-11-12"
+"fetched": "2026-11-12",
+"v": 2
 },
 "9618.HK": {
 "earnings": "2026-11-17",
+"earnings_est": false,
 "ex_div": "2026-04-08",
-"fetched": "2026-11-09"
+"fetched": "2026-11-12",
+"v": 2
 },
 "9633.HK": {
-"earnings": "2026-08-25",
+"earnings": "2027-03-23",
+"earnings_est": false,
 "ex_div": "2026-05-21",
-"fetched": "2026-11-12"
+"fetched": "2026-11-12",
+"v": 2
 },
 "9866.HK": {
 "earnings": "2026-11-24",
+"earnings_est": false,
 "ex_div": null,
-"fetched": "2026-11-09"
+"fetched": "2026-11-12",
+"v": 2
 },
 "9868.HK": {
 "earnings": "2026-11-16",
+"earnings_est": false,
 "ex_div": null,
-"fetched": "2026-11-09"
+"fetched": "2026-11-12",
+"v": 2
 },
 "9880.HK": {
 "earnings": null,
+"earnings_est": false,
 "ex_div": null,
-"fetched": "2026-11-09"
+"fetched": "2026-11-12",
+"v": 2
 },
 "9888.HK": {
 "earnings": "2026-11-16",
+"earnings_est": false,
 "ex_div": null,
-"fetched": "2026-11-09"
+"fetched": "2026-11-12",
+"v": 2
 },
 "9926.HK": {
-"earnings": "2026-08-27",
+"earnings": "2027-03-25",
+"earnings_est": false,
 "ex_div": null,
-"fetched": "2026-11-12"
+"fetched": "2026-11-12",
+"v": 2
 },
 "9961.HK": {
 "earnings": "2026-11-19",
+"earnings_est": false,
 "ex_div": "2025-03-14",
-"fetched": "2026-11-12"
+"fetched": "2026-11-12",
+"v": 2
 },
 "9988.HK": {
 "earnings": "2026-11-19",
+"earnings_est": false,
 "ex_div": "2026-06-10",
-"fetched": "2026-11-09"
+"fetched": "2026-11-12",
+"v": 2
 },
 "9992.HK": {
-"earnings": "2026-08-20",
+"earnings": "2027-03-23",
+"earnings_est": false,
 "ex_div": "2026-05-15",
-"fetched": "2026-11-12"
+"fetched": "2026-11-12",
+"v": 2
 },
 "9999.HK": {
-"earnings": null,
+"earnings": "2026-11-19",
+"earnings_est": true,
 "ex_div": "2026-09-02",
-"fetched": "2026-11-09"
+"fetched": "2026-11-12",
+"v": 2
 },
 "AAPL": {
-"earnings": "2027-01-29",
+"earnings": "2027-01-28",
+"earnings_est": false,
 "ex_div": "2026-11-12",
-"fetched": "2026-11-09"
+"fetched": "2026-11-12",
+"v": 2
 },
 "ABBV": {
-"earnings": "2026-10-30",
+"earnings": "2027-02-03",
+"earnings_est": false,
 "ex_div": "2027-01-15",
-"fetched": "2026-11-12"
+"fetched": "2026-11-12",
+"v": 2
 },
 "AEM": {
-"earnings": "2026-10-28",
+"earnings": "2027-02-11",
+"earnings_est": false,
 "ex_div": "2026-12-01",
-"fetched": "2026-11-12"
+"fetched": "2026-11-12",
+"v": 2
 },
 "AMAT": {
-"earnings": "2026-11-13",
+"earnings": "2026-11-12",
+"earnings_est": false,
 "ex_div": "2026-11-19",
-"fetched": "2026-11-09"
+"fetched": "2026-11-12",
+"v": 2
 },
 "AMD": {
-"earnings": "2027-02-03",
+"earnings": "2027-02-02",
+"earnings_est": false,
 "ex_div": "1995-04-27",
-"fetched": "2026-11-09"
+"fetched": "2026-11-12",
+"v": 2
 },
 "AMZN": {
-"earnings": "2026-10-29",
+"earnings": "2027-02-04",
+"earnings_est": false,
 "ex_div": null,
-"fetched": "2026-11-12"
+"fetched": "2026-11-12",
+"v": 2
 },
 "ANET": {
-"earnings": "2026-11-03",
+"earnings": "2027-02-09",
+"earnings_est": false,
 "ex_div": null,
-"fetched": "2026-11-12"
+"fetched": "2026-11-12",
+"v": 2
 },
 "ARM": {
-"earnings": "2027-02-04",
+"earnings": "2027-02-03",
+"earnings_est": false,
 "ex_div": null,
-"fetched": "2026-11-09"
+"fetched": "2026-11-12",
+"v": 2
 },
 "ASML": {
 "earnings": "2027-01-27",
+"earnings_est": false,
 "ex_div": "2026-10-27",
-"fetched": "2026-11-09"
+"fetched": "2026-11-12",
+"v": 2
 },
 "AVGO": {
-"earnings": "2026-12-10",
+"earnings": "2026-12-09",
+"earnings_est": false,
 "ex_div": "2026-09-21",
-"fetched": "2026-11-09"
+"fetched": "2026-11-12",
+"v": 2
 },
 "B": {
 "earnings": "2027-02-04",
-"ex_div": "2026-08-31",
-"fetched": "2026-11-10"
+"earnings_est": false,
+"ex_div": "2026-11-30",
+"fetched": "2026-11-12",
+"v": 2
 },
 "BABA": {
 "earnings": "2026-11-19",
+"earnings_est": false,
 "ex_div": "2026-06-11",
-"fetched": "2026-11-09"
+"fetched": "2026-11-12",
+"v": 2
 },
 "BAC": {
 "earnings": "2027-01-15",
+"earnings_est": false,
 "ex_div": "2026-12-04",
-"fetched": "2026-11-09"
+"fetched": "2026-11-12",
+"v": 2
 },
 "BIDU": {
 "earnings": "2026-11-16",
+"earnings_est": false,
 "ex_div": null,
-"fetched": "2026-11-09"
+"fetched": "2026-11-12",
+"v": 2
 },
 "BRK-B": {
-"earnings": "2026-11-09",
+"earnings": "2027-03-01",
+"earnings_est": false,
 "ex_div": null,
-"fetched": "2026-11-12"
+"fetched": "2026-11-12",
+"v": 2
 },
 "BTC-USD": {
 "earnings": null,
+"earnings_est": false,
 "ex_div": null,
-"fetched": "2026-11-09"
+"fetched": "2026-11-12",
+"v": 2
 },
 "BTI": {
-"earnings": null,
+"earnings": "2027-02-11",
+"earnings_est": false,
 "ex_div": "2026-12-29",
-"fetched": "2026-11-09"
+"fetched": "2026-11-12",
+"v": 2
 },
 "CEG": {
-"earnings": "2026-11-09",
+"earnings": "2027-02-24",
+"earnings_est": false,
 "ex_div": "2026-11-16",
-"fetched": "2026-11-12"
+"fetched": "2026-11-12",
+"v": 2
 },
 "CIEN": {
 "earnings": "2026-12-10",
+"earnings_est": false,
 "ex_div": null,
-"fetched": "2026-11-09"
+"fetched": "2026-11-12",
+"v": 2
 },
 "COHR": {
-"earnings": "2027-02-04",
+"earnings": "2027-02-03",
+"earnings_est": false,
 "ex_div": null,
-"fetched": "2026-11-09"
+"fetched": "2026-11-12",
+"v": 2
 },
 "COIN": {
-"earnings": "2026-10-29",
+"earnings": "2027-02-11",
+"earnings_est": false,
 "ex_div": null,
-"fetched": "2026-11-12"
+"fetched": "2026-11-12",
+"v": 2
 },
 "COP": {
 "earnings": "2027-02-04",
+"earnings_est": false,
 "ex_div": "2026-11-16",
-"fetched": "2026-11-09"
+"fetched": "2026-11-12",
+"v": 2
 },
 "COST": {
-"earnings": "2026-12-11",
+"earnings": "2026-12-10",
+"earnings_est": false,
 "ex_div": "2026-10-30",
-"fetched": "2026-11-09"
+"fetched": "2026-11-12",
+"v": 2
 },
 "CRM": {
-"earnings": "2026-12-03",
+"earnings": "2026-12-02",
+"earnings_est": false,
 "ex_div": "2026-09-17",
-"fetched": "2026-11-09"
+"fetched": "2026-11-12",
+"v": 2
 },
 "CRWD": {
-"earnings": "2026-12-02",
+"earnings": "2026-12-01",
+"earnings_est": false,
 "ex_div": null,
-"fetched": "2026-11-09"
+"fetched": "2026-11-12",
+"v": 2
 },
 "CSCO": {
-"earnings": "2026-11-13",
+"earnings": "2026-11-12",
+"earnings_est": false,
 "ex_div": "2026-10-02",
-"fetched": "2026-11-09"
+"fetched": "2026-11-12",
+"v": 2
 },
 "CVX": {
 "earnings": "2027-01-29",
+"earnings_est": false,
 "ex_div": "2026-11-18",
-"fetched": "2026-11-09"
+"fetched": "2026-11-12",
+"v": 2
 },
 "GEV": {
 "earnings": "2027-01-27",
+"earnings_est": false,
 "ex_div": "2026-10-27",
-"fetched": "2026-11-09"
+"fetched": "2026-11-12",
+"v": 2
 },
 "GOOGL": {
-"earnings": "2026-10-28",
+"earnings": "2027-02-03",
+"earnings_est": false,
 "ex_div": "2026-12-07",
-"fetched": "2026-11-12"
+"fetched": "2026-11-12",
+"v": 2
 },
 "GS": {
 "earnings": "2027-01-19",
+"earnings_est": false,
 "ex_div": "2026-12-02",
-"fetched": "2026-11-09"
+"fetched": "2026-11-12",
+"v": 2
 },
 "HD": {
 "earnings": "2026-11-17",
+"earnings_est": false,
 "ex_div": "2026-09-03",
-"fetched": "2026-11-09"
+"fetched": "2026-11-12",
+"v": 2
 },
 "HOOD": {
-"earnings": "2026-10-27",
+"earnings": "2027-02-10",
+"earnings_est": false,
 "ex_div": null,
-"fetched": "2026-11-12"
+"fetched": "2026-11-12",
+"v": 2
 },
 "INTC": {
-"earnings": "2027-01-29",
+"earnings": "2027-01-28",
+"earnings_est": false,
 "ex_div": "2024-08-07",
-"fetched": "2026-11-09"
+"fetched": "2026-11-12",
+"v": 2
 },
 "IONQ": {
-"earnings": "2026-11-05",
+"earnings": "2027-02-24",
+"earnings_est": false,
 "ex_div": null,
-"fetched": "2026-11-12"
+"fetched": "2026-11-12",
+"v": 2
 },
 "JD": {
 "earnings": "2026-11-17",
+"earnings_est": false,
 "ex_div": "2026-04-09",
-"fetched": "2026-11-09"
+"fetched": "2026-11-12",
+"v": 2
 },
 "JNJ": {
 "earnings": "2027-01-26",
+"earnings_est": false,
 "ex_div": "2026-11-24",
-"fetched": "2026-11-09"
+"fetched": "2026-11-12",
+"v": 2
 },
 "JPM": {
 "earnings": "2027-01-14",
+"earnings_est": false,
 "ex_div": "2026-10-06",
-"fetched": "2026-11-09"
+"fetched": "2026-11-12",
+"v": 2
 },
 "KLAC": {
-"earnings": "2027-01-29",
+"earnings": "2027-01-28",
+"earnings_est": false,
 "ex_div": "2026-11-16",
-"fetched": "2026-11-09"
+"fetched": "2026-11-12",
+"v": 2
 },
 "LLY": {
-"earnings": "2026-10-29",
+"earnings": "2027-02-03",
+"earnings_est": false,
 "ex_div": "2026-11-13",
-"fetched": "2026-11-12"
+"fetched": "2026-11-12",
+"v": 2
 },
 "LMT": {
 "earnings": "2027-01-26",
+"earnings_est": false,
 "ex_div": "2026-12-01",
-"fetched": "2026-11-09"
+"fetched": "2026-11-12",
+"v": 2
 },
 "LRCX": {
-"earnings": "2027-01-28",
+"earnings": "2027-01-27",
+"earnings_est": false,
 "ex_div": "2026-12-02",
-"fetched": "2026-11-09"
+"fetched": "2026-11-12",
+"v": 2
 },
 "MA": {
 "earnings": "2027-01-28",
+"earnings_est": false,
 "ex_div": "2026-10-09",
-"fetched": "2026-11-09"
+"fetched": "2026-11-12",
+"v": 2
 },
 "MCD": {
-"earnings": "2026-11-04",
+"earnings": "2027-02-11",
+"earnings_est": false,
 "ex_div": "2026-12-01",
-"fetched": "2026-11-12"
+"fetched": "2026-11-12",
+"v": 2
 },
 "META": {
-"earnings": "2027-01-28",
+"earnings": "2027-01-27",
+"earnings_est": false,
 "ex_div": "2026-09-21",
-"fetched": "2026-11-09"
+"fetched": "2026-11-12",
+"v": 2
 },
 "MO": {
 "earnings": "2027-01-28",
+"earnings_est": false,
 "ex_div": "2026-09-15",
-"fetched": "2026-11-09"
+"fetched": "2026-11-12",
+"v": 2
 },
 "MRK": {
-"earnings": "2026-10-29",
+"earnings": "2027-02-02",
+"earnings_est": false,
 "ex_div": "2026-09-15",
-"fetched": "2026-11-12"
+"fetched": "2026-11-12",
+"v": 2
 },
 "MRVL": {
-"earnings": "2026-12-02",
+"earnings": "2026-12-01",
+"earnings_est": false,
 "ex_div": "2026-10-09",
-"fetched": "2026-11-09"
+"fetched": "2026-11-12",
+"v": 2
 },
 "MS": {
 "earnings": "2027-01-14",
+"earnings_est": false,
 "ex_div": "2026-10-30",
-"fetched": "2026-11-09"
+"fetched": "2026-11-12",
+"v": 2
 },
 "MSFT": {
-"earnings": "2027-01-28",
+"earnings": "2027-01-27",
+"earnings_est": false,
 "ex_div": "2026-11-19",
-"fetched": "2026-11-09"
+"fetched": "2026-11-12",
+"v": 2
 },
 "MSTR": {
-"earnings": "2026-10-29",
+"earnings": "2027-02-04",
+"earnings_est": false,
 "ex_div": null,
-"fetched": "2026-11-12"
+"fetched": "2026-11-12",
+"v": 2
 },
 "MU": {
-"earnings": "2026-12-24",
+"earnings": "2026-12-23",
+"earnings_est": false,
 "ex_div": "2026-10-14",
-"fetched": "2026-11-09"
+"fetched": "2026-11-12",
+"v": 2
 },
 "NEE": {
 "earnings": "2027-01-27",
+"earnings_est": false,
 "ex_div": "2026-11-27",
-"fetched": "2026-11-09"
+"fetched": "2026-11-12",
+"v": 2
 },
 "NEM": {
-"earnings": "2026-10-22",
+"earnings": "2027-02-18",
+"earnings_est": false,
 "ex_div": "2026-11-25",
-"fetched": "2026-11-12"
+"fetched": "2026-11-12",
+"v": 2
 },
 "NFLX": {
-"earnings": "2027-01-20",
+"earnings": "2027-01-19",
+"earnings_est": false,
 "ex_div": null,
-"fetched": "2026-11-09"
+"fetched": "2026-11-12",
+"v": 2
 },
 "NIO": {
 "earnings": "2026-11-24",
+"earnings_est": false,
 "ex_div": null,
-"fetched": "2026-11-09"
+"fetched": "2026-11-12",
+"v": 2
 },
 "NKE": {
-"earnings": "2026-12-18",
+"earnings": "2026-12-17",
+"earnings_est": false,
 "ex_div": "2026-09-01",
-"fetched": "2026-11-09"
+"fetched": "2026-11-12",
+"v": 2
 },
 "NOC": {
 "earnings": "2027-01-26",
+"earnings_est": false,
 "ex_div": "2026-08-31",
-"fetched": "2026-11-09"
+"fetched": "2026-11-12",
+"v": 2
 },
 "NOK": {
 "earnings": "2027-01-28",
+"earnings_est": false,
 "ex_div": "2026-10-27",
-"fetched": "2026-11-09"
+"fetched": "2026-11-12",
+"v": 2
 },
 "NOW": {
-"earnings": "2027-01-28",
+"earnings": "2027-01-27",
+"earnings_est": false,
 "ex_div": null,
-"fetched": "2026-11-09"
+"fetched": "2026-11-12",
+"v": 2
 },
 "NVDA": {
-"earnings": "2026-11-18",
+"earnings": "2026-11-17",
+"earnings_est": false,
 "ex_div": "2026-09-10",
-"fetched": "2026-11-09"
+"fetched": "2026-11-12",
+"v": 2
 },
 "NVO": {
 "earnings": "2027-02-03",
+"earnings_est": false,
 "ex_div": "2026-08-17",
-"fetched": "2026-11-09"
+"fetched": "2026-11-12",
+"v": 2
 },
 "OKLO": {
-"earnings": "2026-11-06",
+"earnings": "2027-03-16",
+"earnings_est": false,
 "ex_div": null,
-"fetched": "2026-11-12"
+"fetched": "2026-11-12",
+"v": 2
 },
 "ORCL": {
-"earnings": "2026-12-15",
+"earnings": "2026-12-14",
+"earnings_est": false,
 "ex_div": "2026-10-09",
-"fetched": "2026-11-09"
+"fetched": "2026-11-12",
+"v": 2
 },
 "OXY": {
-"earnings": "2026-11-09",
+"earnings": "2027-02-17",
+"earnings_est": false,
 "ex_div": "2026-12-10",
-"fetched": "2026-11-12"
+"fetched": "2026-11-12",
+"v": 2
 },
 "PANW": {
-"earnings": "2026-11-19",
+"earnings": "2026-11-18",
+"earnings_est": false,
 "ex_div": null,
-"fetched": "2026-11-09"
+"fetched": "2026-11-12",
+"v": 2
 },
 "PDD": {
 "earnings": "2026-11-18",
+"earnings_est": false,
 "ex_div": null,
-"fetched": "2026-11-09"
+"fetched": "2026-11-12",
+"v": 2
 },
 "PFE": {
 "earnings": "2027-02-02",
+"earnings_est": false,
 "ex_div": "2026-11-06",
-"fetched": "2026-11-09"
+"fetched": "2026-11-12",
+"v": 2
 },
 "PLTR": {
-"earnings": "2027-02-02",
+"earnings": "2027-02-01",
+"earnings_est": false,
 "ex_div": null,
-"fetched": "2026-11-09"
+"fetched": "2026-11-12",
+"v": 2
 },
 "PM": {
-"earnings": "2026-10-21",
+"earnings": "2027-02-04",
+"earnings_est": false,
 "ex_div": "2026-10-02",
-"fetched": "2026-11-12"
+"fetched": "2026-11-12",
+"v": 2
 },
 "PYPL": {
-"earnings": "2026-10-27",
+"earnings": "2027-02-02",
+"earnings_est": false,
 "ex_div": "2026-12-04",
-"fetched": "2026-11-12"
+"fetched": "2026-11-12",
+"v": 2
 },
 "QBTS": {
-"earnings": "2026-11-10",
+"earnings": "2027-02-25",
+"earnings_est": false,
 "ex_div": null,
-"fetched": "2026-11-12"
+"fetched": "2026-11-12",
+"v": 2
 },
 "QCOM": {
-"earnings": "2027-02-04",
+"earnings": "2027-02-03",
+"earnings_est": false,
 "ex_div": "2026-12-03",
-"fetched": "2026-11-09"
+"fetched": "2026-11-12",
+"v": 2
 },
 "RGTI": {
-"earnings": "2026-11-10",
+"earnings": "2027-03-04",
+"earnings_est": false,
 "ex_div": null,
-"fetched": "2026-11-12"
+"fetched": "2026-11-12",
+"v": 2
 },
 "RIVN": {
-"earnings": "2026-10-29",
+"earnings": "2027-02-11",
+"earnings_est": false,
 "ex_div": null,
-"fetched": "2026-11-12"
+"fetched": "2026-11-12",
+"v": 2
 },
 "RKLB": {
-"earnings": "2026-11-09",
+"earnings": "2027-02-25",
+"earnings_est": false,
 "ex_div": null,
-"fetched": "2026-11-12"
+"fetched": "2026-11-12",
+"v": 2
 },
 "RTX": {
 "earnings": "2027-01-26",
+"earnings_est": false,
 "ex_div": "2026-11-20",
-"fetched": "2026-11-09"
+"fetched": "2026-11-12",
+"v": 2
 },
 "SBUX": {
-"earnings": "2027-01-28",
+"earnings": "2027-01-27",
+"earnings_est": false,
 "ex_div": "2026-11-13",
-"fetched": "2026-11-09"
+"fetched": "2026-11-12",
+"v": 2
 },
 "SLB": {
 "earnings": "2027-01-22",
+"earnings_est": false,
 "ex_div": "2026-12-02",
-"fetched": "2026-11-09"
+"fetched": "2026-11-12",
+"v": 2
 },
 "SMR": {
-"earnings": "2026-11-05",
+"earnings": "2027-02-25",
+"earnings_est": false,
 "ex_div": null,
-"fetched": "2026-11-12"
+"fetched": "2026-11-12",
+"v": 2
 },
 "SNOW": {
-"earnings": "2026-12-03",
+"earnings": "2026-12-02",
+"earnings_est": false,
 "ex_div": null,
-"fetched": "2026-11-09"
+"fetched": "2026-11-12",
+"v": 2
 },
 "SPCX": {
-"earnings": "2026-10-20",
+"earnings": "2027-02-09",
+"earnings_est": false,
 "ex_div": null,
-"fetched": "2026-11-12"
+"fetched": "2026-11-12",
+"v": 2
 },
 "TME": {
 "earnings": "2026-11-17",
+"earnings_est": false,
 "ex_div": "2026-04-02",
-"fetched": "2026-11-09"
+"fetched": "2026-11-12",
+"v": 2
 },
 "TSLA": {
-"earnings": "2027-01-28",
+"earnings": "2027-01-27",
+"earnings_est": false,
 "ex_div": null,
-"fetched": "2026-11-09"
+"fetched": "2026-11-12",
+"v": 2
 },
 "TSM": {
 "earnings": "2027-01-14",
+"earnings_est": false,
 "ex_div": "2026-12-10",
-"fetched": "2026-11-09"
+"fetched": "2026-11-12",
+"v": 2
 },
 "UBER": {
 "earnings": "2027-02-03",
+"earnings_est": false,
 "ex_div": null,
-"fetched": "2026-11-09"
+"fetched": "2026-11-12",
+"v": 2
 },
 "UNH": {
 "earnings": "2027-01-12",
+"earnings_est": false,
 "ex_div": "2026-12-07",
-"fetched": "2026-11-09"
+"fetched": "2026-11-12",
+"v": 2
 },
 "V": {
-"earnings": "2027-01-27",
+"earnings": "2027-01-26",
+"earnings_est": false,
 "ex_div": "2026-11-10",
-"fetched": "2026-11-09"
+"fetched": "2026-11-12",
+"v": 2
 },
 "VOO": {
 "earnings": null,
+"earnings_est": false,
 "ex_div": null,
-"fetched": "2026-11-09"
+"fetched": "2026-11-12",
+"v": 2
 },
 "VST": {
-"earnings": "2026-11-06",
+"earnings": "2027-02-25",
+"earnings_est": false,
 "ex_div": "2026-12-22",
-"fetched": "2026-11-12"
+"fetched": "2026-11-12",
+"v": 2
 },
 "WFC": {
 "earnings": "2027-01-14",
+"earnings_est": false,
 "ex_div": "2026-11-06",
-"fetched": "2026-11-09"
+"fetched": "2026-11-12",
+"v": 2
 },
 "WMT": {
 "earnings": "2026-11-19",
+"earnings_est": false,
 "ex_div": "2026-12-11",
-"fetched": "2026-11-09"
+"fetched": "2026-11-12",
+"v": 2
 },
 "WPM": {
-"earnings": "2026-11-05",
+"earnings": "2027-03-11",
+"earnings_est": false,
 "ex_div": "2026-11-19",
-"fetched": "2026-11-12"
+"fetched": "2026-11-12",
+"v": 2
 },
 "XOM": {
 "earnings": "2027-01-29",
+"earnings_est": false,
 "ex_div": "2026-11-16",
-"fetched": "2026-11-09"
+"fetched": "2026-11-12",
+"v": 2
 },
 "XYZ": {
-"earnings": "2026-11-03",
+"earnings": "2027-03-01",
+"earnings_est": false,
 "ex_div": null,
-"fetched": "2026-11-12"
+"fetched": "2026-11-12",
+"v": 2
 }
 }
