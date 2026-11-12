@@ -23,7 +23,13 @@ Fill rules (an order only ever uses prices from sessions that opened after it wa
   - No margin and no short selling: a buy is cut to what the cash pays for (whole board lots in HK),
     or rejected.
   - Fees approximate Futu's published schedule; US trades convert at the day's USD/HKD rate with no
-    conversion fee. Prices are Yahoo daily bars, not dividend-adjusted; dividends are not credited.
+    conversion fee. Prices are Yahoo daily bars, not dividend-adjusted.
+  - Dividends: a position held before an ex-dividend session's open is credited the dividend in cash at
+    that open (the price gap on the ex-date is real and can still trip a stop, as it would at a broker).
+    US dividends lose the 30% withholding tax a Hong Kong resident pays; HK dividends are credited in
+    full (H shares really lose 10%, which is not modelled). A dividend counts towards the trade's P&L.
+  - Splits: on the split session shares are multiplied and cost, stop, target and 1R divided by the
+    ratio; orders still waiting in that stock are cancelled because their prices are pre-split.
 
   python -m hkstock.paper update                       # GitHub Actions, every run
   python -m hkstock.paper brief                        # account summary for Claude
@@ -59,17 +65,28 @@ CAPITAL = 100_000.0
 SLIP = {"hk": 0.001, "us": 0.0005}
 MAX_POSITION = 0.25      # of equity, checked when the order is placed
 MAX_ONE_LOT = 0.45       # an HK board lot may go up to this, so big-lot blue chips stay tradeable
+MAX_THEME = 0.40         # one theme (held + waiting + new), unless the new buy is the theme's only stock
+CORR_LIMIT, MAX_GROUP = 0.6, 0.40   # stocks whose 60-day daily returns correlate this much count as one bet
+MAX_RISK = 0.015         # shares x (entry - stop) x FX, as a share of equity
+MIN_CASH = 0.10          # cash left after every waiting buy
+MAX_POSITIONS = 8
+LOCK_WORDS = ("鎖定", "鎖住", "保本", "鎖利")   # a stop described like this must be at or above the cost
 MAX_REASON, MAX_PLAN = 200, 700
 SETUPS = ("突破", "回調", "超賣反彈", "趨勢跟隨", "消息/業績", "其他")   # the kind of trade, for the learning stats
 MAX_REVIEW, MAX_LESSON = 300, 200
 MIN_ADOPT = 5           # a lesson needs this many supporting closed trades before it becomes a hard rule
 FX_DEFAULT = 7.8
+DIV_TAX = {"hk": 0.0, "us": 0.30}   # withholding on dividends for a Hong Kong resident
 INDEX = {"hk": "^HSI", "us": "^GSPC"}
 STOCK_FILES = {"hk": "data.json", "us": "us.json"}
 RULES = ("起始資金 10 萬港元;港股美股共用現金(美元按當日匯率);唔可以借錢或者沽空;"
          f"每隻股票落單時最多佔資產 {MAX_POSITION:.0%}(港股每手太大嘅可以買一手,最多 {MAX_ONE_LOT:.0%});買入一定要有止蝕;"
+         f"每單去到止蝕最多蝕資產 {MAX_RISK:.1%};同一板塊、或者 60 日走勢相關系數 {CORR_LIMIT} 以上嘅股票加埋最多 {MAX_GROUP:.0%};"
+         f"最多 {MAX_POSITIONS} 隻股票;所有買單成交後要留最少 {MIN_CASH:.0%} 現金;"
          "落單後由下一個開市時段先生效,用真實開市價/最高/最低價成交;限價單同目標價要開市價已經去到,"
-         "或者全日最低(沽出就係最高)穿過咗限價先算成交,啱啱掂到唔計;費用按富途收費估算。")
+         "或者全日最低(沽出就係最高)穿過咗限價先算成交,啱啱掂到唔計;費用按富途收費估算;"
+         "除淨日前持有嘅股票會收股息(美股扣 30% 預扣稅,港股全數,H 股實際要扣 10% 未計),股息計入嗰單交易嘅盈虧;"
+         "拆股會自動調整股數、成本同止蝕。")
 
 
 # ---------------------------------------------------------------- basics
@@ -146,7 +163,7 @@ def write_json(path: Path, obj, compact: bool = False) -> None:
 
 def new_state(start: datetime) -> dict:
     return {"start": iso(start), "capital": CAPITAL, "through": iso(start), "cash": CAPITAL,
-            "positions": {}, "orders": {}, "fills": [], "trades": [], "fees": 0.0, "history": {}}
+            "positions": {}, "orders": {}, "fills": [], "trades": [], "fees": 0.0, "history": {}, "dividends": []}
 
 
 # ---------------------------------------------------------------- prices
@@ -168,6 +185,17 @@ class Bars:
         if any(not (v == v) or v <= 0 for v in (r["Open"], r["High"], r["Low"], r["Close"])):  # NaN check
             return None
         return {"o": float(r["Open"]), "h": float(r["High"]), "l": float(r["Low"]), "c": float(r["Close"])}
+
+    def actions(self, ticker: str, d: date) -> tuple[float, float]:
+        """(dividend per share, split ratio) with that date as ex-date; (0, 0) when none."""
+        import pandas as pd
+        f = self.frames.get(ticker)
+        ts = pd.Timestamp(d)
+        if f is None or ts not in f.index:
+            return 0.0, 0.0
+        r = f.loc[ts]
+        num = lambda k: float(r[k]) if k in f.columns and r[k] == r[k] and r[k] > 0 else 0.0
+        return num("Dividends"), num("Stock Splits")
 
     def last_close(self, ticker: str, upto: date | None = None):
         f = self.frames.get(ticker)
@@ -191,15 +219,16 @@ def download(tickers: list[str], start: date) -> Bars:
     import pandas as pd
     import yfinance as yf
     yf.set_tz_cache_location(tempfile.mkdtemp(prefix="yf_"))
-    df = yf.download(sorted(set(tickers)), start=start.isoformat(), auto_adjust=False, progress=False,
-                     threads=True, group_by="column")
+    df = yf.download(sorted(set(tickers)), start=start.isoformat(), auto_adjust=False, actions=True,
+                     progress=False, threads=True, group_by="column")
     frames = {}
     if df is None or df.empty:
         return Bars(frames)
     if not isinstance(df.columns, pd.MultiIndex):
         df.columns = pd.MultiIndex.from_product([df.columns, tickers[:1]])
     for t in set(df.columns.get_level_values(1)):
-        f = pd.DataFrame({k: df[(k, t)] for k in ("Open", "High", "Low", "Close") if (k, t) in df.columns})
+        f = pd.DataFrame({k: df[(k, t)] for k in ("Open", "High", "Low", "Close", "Dividends", "Stock Splits")
+                          if (k, t) in df.columns})
         f.index = pd.to_datetime(f.index).tz_localize(None).normalize()
         frames[t] = f[~f.index.duplicated(keep="last")]
     return Bars(frames)
@@ -228,7 +257,7 @@ def _fill_buy(st, o, price, m, d, fx, why):
         p = st["positions"][o["ticker"]] = {"shares": shares, "cost": (v + f) / shares, "market": m,
                                             "opened": d.isoformat(), "reason": o.get("reason", ""),
                                             "order": o.get("id"), "setup": o.get("setup", "其他"),
-                                            "ctx": o.get("ctx", {})}
+                                            "ctx": o.get("ctx", {}), "entry_at_open": bool(o.get("at_open"))}
         if o.get("stop") is not None and o["stop"] < p["cost"]:
             p["risk"] = p["cost"] - o["stop"]          # first stop distance per share = 1R
     if o.get("stop") is not None:
@@ -248,7 +277,9 @@ def _fill_sell(st, ticker, shares, price, m, d, fx, why):
     fxm = fx if m == "us" else 1.0
     v = shares * price
     f = fee(m, "sell", shares, v)
-    pnl_local = v - f - p["cost"] * shares
+    div = p.get("div", 0.0) * shares / p["shares"]               # this part's share of dividends received
+    p["div"] = p.get("div", 0.0) - div
+    pnl_local = v - f - p["cost"] * shares + div
     st["cash"] += (v - f) * fxm
     st["fees"] += f * fxm
     st["fills"].append({"date": d.isoformat(), "ticker": ticker, "side": "sell", "shares": shares,
@@ -257,11 +288,37 @@ def _fill_sell(st, ticker, shares, price, m, d, fx, why):
                          "shares": shares, "entry": round(p["cost"], 4), "exit": round(price, 4),
                          "pnl_hkd": round(pnl_local * fxm, 2), "pnl_pct": round(pnl_local / (p["cost"] * shares), 4),
                          "why": why, "reason": p.get("reason", ""), "id": len(st["trades"]) + 1,
+                         "div_hkd": round(div * fxm, 2), "entry_at_open": p.get("entry_at_open", False),
                          "setup": p.get("setup", "其他"), "ctx": p.get("ctx", {}), "order": p.get("order"),
                          "r": round(pnl_local / (p["risk"] * shares), 2) if p.get("risk") else None})
     p["shares"] -= shares
     if p["shares"] <= 0:
         del st["positions"][ticker]
+
+
+def _corporate_actions(st, m, d, bars, fx, entries):
+    """Dividends and splits with this session as ex-date, for positions held before the open."""
+    fxm = fx if m == "us" else 1.0
+    for t, p in list(st["positions"].items()):
+        if p["market"] != m:
+            continue
+        div, split = bars.actions(t, d)
+        if split and split != 1:
+            p["shares"] = int(round(p["shares"] * split))
+            for k in ("cost", "stop", "target", "risk"):
+                if p.get(k) is not None:
+                    p[k] = p[k] / split
+            for i, o in st["orders"].items():
+                e = next((x for x in entries if str(x["id"]) == i), None)
+                if o["status"] == "pending" and e and e.get("ticker") == t:
+                    o["status"], o["note"] = "cancelled", "拆股,舊價錢唔再啱,要重新落單"
+            st.setdefault("dividends", []).append({"date": d.isoformat(), "ticker": t, "kind": "split", "ratio": split})
+        if div:
+            net = p["shares"] * div * (1 - DIV_TAX[m])
+            p["div"] = p.get("div", 0.0) + net
+            st["cash"] += net * fxm
+            st.setdefault("dividends", []).append({"date": d.isoformat(), "ticker": t, "kind": "div", "per_share": div,
+                                                   "shares": p["shares"], "net_hkd": round(net * fxm, 2)})
 
 
 def _register(st, e, open_t):
@@ -297,6 +354,7 @@ def step(st: dict, session: tuple, entries: list[dict], bars: Bars, final: bool,
     if closed:
         return
     fx = bars.fx(d)
+    _corporate_actions(st, m, d, bars, fx, entries)
     by_id = {str(e["id"]): e for e in entries if e["type"] in ("buy", "sell")}
     active = [(by_id[i], o) for i, o in st["orders"].items()
               if o["status"] == "pending" and i in by_id and market_of(by_id[i]["ticker"]) == m]
@@ -313,7 +371,8 @@ def step(st: dict, session: tuple, entries: list[dict], bars: Bars, final: bool,
         if e["side"] == "buy":
             px = b["o"] * (1 + SLIP[m]) if lim is None else _limit_buy(b, lim)
             if px is not None:
-                ok, note = _fill_buy(st, {**e, "lot": e.get("lot", 1)}, px, m, d, fx, f"單號 {e['id']}")
+                at_open = lim is None or px == b["o"]      # filled at the open: the whole day's range came after
+                ok, note = _fill_buy(st, {**e, "lot": e.get("lot", 1), "at_open": at_open}, px, m, d, fx, f"單號 {e['id']}")
                 o["status"], o["note"] = ("filled", note) if ok else ("rejected", note)
                 continue
         else:
@@ -401,13 +460,43 @@ def valuation(st: dict, bars: Bars, today: date) -> tuple[float, list[dict]]:
         last = last if last is not None else p["cost"]
         fx = bars.fx(today) if p["market"] == "us" else 1.0
         val = p["shares"] * last * fx
+        div = p.get("div", 0.0)
         total += val
         rows.append({"ticker": t, "name": nm.get(t, t), "market": p["market"], "shares": p["shares"],
                      "cost": round(p["cost"], 4), "last": round(last, 4), "last_date": when,
-                     "value_hkd": round(val, 2), "pnl_hkd": round((last - p["cost"]) * p["shares"] * fx, 2),
-                     "pnl_pct": round(last / p["cost"] - 1, 4), "stop": p.get("stop"), "target": p.get("target"),
+                     "value_hkd": round(val, 2), "pnl_hkd": round(((last - p["cost"]) * p["shares"] + div) * fx, 2),
+                     "pnl_pct": round((last * p["shares"] + div) / (p["cost"] * p["shares"]) - 1, 4),
+                     "div_hkd": round(div * fx, 2), "stop": p.get("stop"), "target": p.get("target"),
                      "opened": p["opened"], "reason": p.get("reason", "")})
     return total, rows
+
+
+def next_ex_dividend(history: dict, known: str | None, today: date) -> dict | None:
+    """Next ex-dividend date for a held stock: Yahoo's own date if it is still ahead, else one year after
+    an ex-date in the past year (most companies keep the same calendar). history = {date: per share}."""
+    if known and known >= today.isoformat():
+        amt = next((v for d, v in sorted(history.items(), reverse=True)), None)
+        return {"date": known, "est": False, "per_share": amt}
+    guesses = sorted((d + timedelta(days=364), v) for d, v in history.items()
+                     if today <= d + timedelta(days=364) <= today + timedelta(days=90))
+    return {"date": guesses[0][0].isoformat(), "est": True, "per_share": guesses[0][1]} if guesses else None
+
+
+def dividend_outlook(tickers: list[str], today: date) -> dict:
+    import yfinance as yf
+    cal = read_json(DATA / "events.json", {})
+    out = {}
+    for t in tickers:
+        try:
+            s = yf.Ticker(t).dividends
+            hist = {ts.date(): float(v) for ts, v in s.items() if v > 0} if s is not None else {}
+        except Exception as e:
+            print(f"  dividends {t}: {e!r}")
+            continue
+        nxt = next_ex_dividend(hist, (cal.get(t) or {}).get("ex_div"), today)
+        if nxt:
+            out[t] = nxt
+    return out
 
 
 def benchmark(state: dict, bars: Bars) -> float | None:
@@ -444,9 +533,14 @@ def stats(live: dict, history: dict) -> dict:
             "realised": round(gain - loss, 2)}
 
 
-def build_view(final: dict, live: dict, entries: list[dict], bars: Bars, now: datetime) -> tuple[dict, dict]:
+def build_view(final: dict, live: dict, entries: list[dict], bars: Bars, now: datetime,
+               outlook: dict | None = None) -> tuple[dict, dict]:
     today = now.astimezone(HKT).date()
     equity, rows = valuation(live, bars, today)
+    for r in rows:
+        x = (outlook or {}).get(r["ticker"])
+        if x:
+            r["ex_div"] = {**x, "drop": round(x["per_share"] / r["last"], 4) if x.get("per_share") else None}
     bench = benchmark(final, bars)
     history = dict(final.get("history", {}))
     history[today.isoformat()] = {"equity": round(equity, 2), "bench": round(bench, 2) if bench else None}
@@ -461,9 +555,9 @@ def build_view(final: dict, live: dict, entries: list[dict], bars: Bars, now: da
         orders.append({"id": e["id"], "placed": hkt_str(e["t"]), "ticker": e["ticker"], "name": nm.get(e["ticker"], e["ticker"]),
                        "side": e["side"], "shares": e["shares"], "limit": e.get("limit"), "stop": e.get("stop"),
                        "target": e.get("target"), "days": e.get("days", 1), "status": o["status"],
-                       "note": o.get("note", ""), "reason": e.get("reason", "")})
+                       "note": o.get("note", ""), "reason": e.get("reason", ""), "check": e.get("check")})
     controls = [{"placed": hkt_str(e["t"]), "type": e["type"], "ticker": e.get("ticker"), "order": e.get("order"),
-                 "stop": e.get("stop"), "target": e.get("target"), "reason": e.get("reason", "")}
+                 "stop": e.get("stop"), "target": e.get("target"), "reason": e.get("reason", ""), "check": e.get("check")}
                 for e in entries if e["type"] in ("cancel", "exit")][-20:][::-1]
     plans = [{"placed": hkt_str(e["t"]), "text": e["text"]} for e in entries if e["type"] == "plan"][-10:][::-1]
     rv = learn.reviews(entries)
@@ -480,7 +574,8 @@ def build_view(final: dict, live: dict, entries: list[dict], bars: Bars, now: da
                       "diagnostics": learn.diagnostics(scored), "min_n": learn.MIN_N, "min_adopt": MIN_ADOPT},
             "lessons": learn.fold_lessons(entries),
             "history": [[k, v["equity"], v["bench"]] for k, v in sorted(history.items())],
-            "plans": plans, "stats": stats(live, history), "rules": RULES}
+            "plans": plans, "stats": stats(live, history), "rules": RULES,
+            "dividends": [{**x, "name": nm.get(x["ticker"], x["ticker"])} for x in live.get("dividends", [])][-30:][::-1]}
     return final, view
 
 
@@ -517,7 +612,12 @@ def update(now: datetime | None = None) -> dict:
     tickers = {e["ticker"] for e in entries if e.get("ticker")} | set(state["positions"]) | set(INDEX.values()) | {"HKD=X"}
     bars = download(sorted(tickers), parse_t(state["start"]).date() - timedelta(days=10))
     final, live = advance(state, entries, bars, now)
-    final, view = build_view(final, live, entries, bars, now)
+    try:
+        outlook = dividend_outlook(sorted(live["positions"]), now.astimezone(HKT).date())
+    except Exception as e:
+        print(f"::warning::dividend dates not fetched: {e!r}")
+        outlook = {}
+    final, view = build_view(final, live, entries, bars, now, outlook)
     write_json(STATE, final)
     write_json(VIEW, view, compact=True)
     return view
@@ -586,6 +686,21 @@ def _context(ticker: str, ref: float, stop) -> dict:
             "earn_days": st.get("earn_days"), "stop_pct": rnd(stop / ref - 1, 4) if stop else None}
 
 
+def _correlations(ticker: str, others: list[str]) -> dict:
+    """60-session daily-return correlation of `ticker` with each of `others`; {} if prices are unavailable."""
+    if not others:
+        return {}
+    try:
+        import yfinance as yf
+        yf.set_tz_cache_location(tempfile.mkdtemp(prefix="yf_"))
+        px = yf.download(sorted({ticker, *others}), period="6mo", auto_adjust=True, progress=False)["Close"]
+        r = px.ffill().pct_change().tail(60)
+        return {o: float(r[ticker].corr(r[o])) for o in others if o in r and ticker in r}
+    except Exception as e:
+        print(f"(相關系數計唔到,今次略過呢項檢查:{e!r})")
+        return {}
+
+
 def place_order(ticker: str, side: str, shares: int, limit=None, stop=None, target=None, days: int = 1,
                 reason: str = "", setup: str = "其他") -> dict:
     view = read_json(VIEW, None)
@@ -629,12 +744,41 @@ def place_order(ticker: str, side: str, shares: int, limit=None, stop=None, targ
                              f"(資產 {MAX_POSITION:.0%};港股一手最多 {MAX_ONE_LOT:.0%})")
         if cost * 1.003 > view["cash"] - pend_buy:
             raise SystemExit(f"現金唔夠:可用約 {view['cash'] - pend_buy:,.0f} 港元,呢張單約 {cost:,.0f}")
+        eq = view["equity"]
+        left = view["cash"] - pend_buy - cost * 1.003
+        if left < MIN_CASH * eq:
+            raise SystemExit(f"要留最少 {MIN_CASH:.0%} 現金:呢張單成交後只剩約 {left:,.0f} 港元")
+        risk = shares * (ref - stop) * fx
+        if risk > MAX_RISK * eq + 1e-6:
+            most = int(MAX_RISK * eq / ((ref - stop) * fx) // lot * lot)
+            raise SystemExit(f"風險太大:去到止蝕會蝕約 {risk:,.0f} 港元(資產 {risk / eq:.1%}),上限 {MAX_RISK:.1%};"
+                             f"呢個止蝕最多買 {most} 股,或者收窄止蝕")
+        exposure = {t: p["value_hkd"] for t, p in pos.items()}
+        for t, v in pend_by_ticker.items():
+            exposure[t] = exposure.get(t, 0) + v
+        if ticker not in exposure and len(exposure) >= MAX_POSITIONS:
+            raise SystemExit(f"已經有 {len(exposure)} 隻股票(連未成交買單),上限 {MAX_POSITIONS} 隻")
+        stocks = _stocks()
+        theme = s.get("theme")
+        same = {t: v for t, v in exposure.items() if t != ticker and theme and stocks.get(t, {}).get("theme") == theme}
+        if same and sum(same.values()) + exposure.get(ticker, 0) + cost > MAX_THEME * eq:
+            raise SystemExit(f"「{theme}」板塊太集中:已有 {', '.join(same)} 共 {sum(same.values()):,.0f} 港元,"
+                             f"加呢張單會超過資產 {MAX_THEME:.0%}")
+        others = [t for t in exposure if t != ticker]
+        corr = {t: c for t, c in _correlations(ticker, others).items() if c >= CORR_LIMIT}
+        if corr and sum(exposure[t] for t in corr) + exposure.get(ticker, 0) + cost > MAX_GROUP * eq:
+            raise SystemExit("同現有持倉走勢太相似:" + ", ".join(f"{t} 相關 {c:.2f}" for t, c in corr.items())
+                             + f",加埋會超過資產 {MAX_GROUP:.0%}")
+        check = {"risk_hkd": round(risk, 0), "risk_pct": round(risk / eq, 4), "size_pct": round(cost / eq, 4),
+                 "corr": {t: round(c, 2) for t, c in corr.items()}}
     else:
         have = pos.get(ticker, {}).get("shares", 0) - pend_sell.get(ticker, 0)
         if shares > have:
             raise SystemExit(f"可以沽嘅只有 {have} 股")
         stop = target = None
     e = {"type": side, "ticker": ticker, "side": side, "shares": int(shares), "days": int(days), "reason": reason}
+    if side == "buy":
+        e["check"] = check
     if side == "buy":
         if setup not in SETUPS:
             raise SystemExit(f"--setup 要係 {SETUPS} 其中之一")
@@ -663,7 +807,15 @@ def set_exit(ticker: str, stop=None, target=None, clear_target=False, reason: st
         raise SystemExit(f"止蝕要低過現價 {p['last']}")
     if target is not None and target <= p["last"]:
         raise SystemExit(f"目標要高過現價 {p['last']}")
-    e = {"type": "exit", "ticker": ticker, "reason": _reason(reason)}
+    reason = _reason(reason)
+    e = {"type": "exit", "ticker": ticker, "reason": reason}
+    if stop is not None:
+        vs_cost = stop / p["cost"] - 1
+        fx = view.get("fx", FX_DEFAULT) if market_of(ticker) == "us" else 1.0
+        if vs_cost < 0 and any(w in reason for w in LOCK_WORDS):
+            raise SystemExit(f"理由講鎖定盈利/保本,但新止蝕 {stop} 低過成本 {p['cost']:.2f}(觸發會蝕約 "
+                             f"{(p['cost'] - stop) * p['shares'] * fx:,.0f} 港元);改理由或者改止蝕")
+        e["check"] = {"stop_vs_cost": round(vs_cost, 4), "pnl_at_stop_hkd": round((stop - p["cost"]) * p["shares"] * fx, 0)}
     if stop is not None:
         e["stop"] = float(stop)
     if target is not None:
@@ -741,14 +893,31 @@ def brief() -> str:
         lines.append(f"- {p['name']} {p['ticker']} {p['shares']}股 成本{p['cost']:.2f} 現價{p['last']} ({p['last_date']}) "
                      f"盈虧{p['pnl_hkd']:+,.0f}港元 {pc(p['pnl_pct'])} 止蝕{p['stop']} 目標{p['target']} 開倉{p['opened']} "
                      f"| 系統短炒計劃{json.dumps(s.get('plan', {}).get('short'), ensure_ascii=False)} RSI{s.get('rsi', 0):.0f} "
-                     f"業績{s.get('earnings') or '–'} | 買入理由:{p['reason']}")
+                     f"業績{s.get('earnings') or '–'}{'(估)' if s.get('earnings_est') else ''}"
+                     + (f" 已收股息{p['div_hkd']:,.0f}港元" if p.get("div_hkd") else "")
+                     + (f" | 除淨{p['ex_div']['date']}{'(按去年估計)' if p['ex_div']['est'] else ''} 每股約{p['ex_div']['per_share']}"
+                        f",除淨日股價約跌{(p['ex_div']['drop'] or 0) * 100:.1f}%,會收返股息但跌幅可能觸發止蝕" if p.get("ex_div") else "")
+                     + f" | 買入理由:{p['reason']}")
     if not v["positions"]:
         lines.append("(冇持倉)")
     lines.append("\n## 未成交 / 最近嘅單")
     for o in v["orders"][:15]:
         lines.append(f"- #{o['id']} {o['placed']} {o['side']} {o['name']} {o['ticker']} {o['shares']}股 "
                      f"{'限價' + str(o['limit']) if o['limit'] else '市價'} 止蝕{o['stop']} 目標{o['target']} "
-                     f"→ {o['status']} {o['note']}")
+                     f"→ {o['status']} {o['note']}"
+                     + (f" | 系統計:止蝕風險{o['check']['risk_hkd']:,.0f}港元({pc(o['check']['risk_pct'])}資產)"
+                        f" 佔資產{pc(o['check']['size_pct'])}" if o.get("check") else ""))
+    for c in v.get("controls", [])[:8]:
+        k = c.get("check") or {}
+        what = f"取消 #{c['order']}" if c["type"] == "cancel" else f"{c['ticker']} 改止蝕{c['stop']} 目標{c['target']}"
+        lines.append(f"- {c['placed']} {what}"
+                     + (f" | 系統計:止蝕對成本{pc(k['stop_vs_cost'])},觸發盈虧約{k['pnl_at_stop_hkd']:+,.0f}港元" if k else "")
+                     + f" | 理由:{c['reason']}")
+    if v.get("dividends"):
+        lines.append("\n## 股息及拆股")
+        for d in v["dividends"][:8]:
+            lines.append(f"- {d['date']} {d['name']} " + (f"每股{d['per_share']} 淨收{d['net_hkd']:,.0f}港元"
+                                                         if d["kind"] == "div" else f"拆股 1 變 {d['ratio']}"))
     lines.append("\n## 最近成交")
     for f in v["fills"][:10]:
         lines.append(f"- {f['date']} {f['side']} {f['name']} {f['shares']}股 @{f['price']} ({f['why']})")

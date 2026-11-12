@@ -26,11 +26,19 @@ def test_holiday_session_is_closed_and_inactive():
     assert data.market_session(HK, datetime(2026, 11, 10, 11, 0, tzinfo=HKT)) == "盤中"
 
 
-def test_holidays_are_weekdays_and_lists_cover_the_current_year():
+def test_holidays_are_weekdays():
     for market in ("hk", "us"):
         for d in market_days.HOLIDAYS[market]:
             assert date.fromisoformat(d).weekday() < 5
-    assert date.today() <= market_days.COVERED_UNTIL, "extend hkstock/market_days.py with next year's holidays"
+
+
+def test_years_past_the_lists_are_computed():
+    # past COVERED_UNTIL the exchange_calendars package answers, so the system never silently treats
+    # Christmas or Lunar New Year as a trading day (and no test time-bomb stops the updates)
+    assert market_days.is_holiday("us", date(2029, 12, 25))
+    assert market_days.is_holiday("hk", date(2029, 12, 25))
+    assert not market_days.is_holiday("us", date(2029, 12, 27))
+    assert market_days.is_holiday("us", date(2028, 11, 23))       # listed year: Thanksgiving 2028
 
 
 def test_upcoming_window():

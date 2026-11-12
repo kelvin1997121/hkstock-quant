@@ -175,7 +175,17 @@ def test_upcoming_earnings_window():
     from datetime import date
     cal = {"A": {"earnings": "2026-11-12"}, "B": {"earnings": "2026-12-30"}, "C": {"earnings": None}}
     up = events.upcoming(cal, {"A": "甲"}, within=7, today=date(2026, 11, 10))
-    assert up == [{"ticker": "A", "name": "甲", "date": "2026-11-12", "days": 2}]
+    assert up == [{"ticker": "A", "name": "甲", "date": "2026-11-12", "days": 2, "est": False}]
+
+
+def test_next_earnings_uses_future_dates_then_last_years_season():
+    from datetime import date
+    today = date(2026, 11, 12)
+    assert events.next_earnings([date(2026, 8, 20), date(2027, 3, 19)], today) == ("2027-03-19", False)
+    # only past dates (typical for HK on Yahoo): a year after last November's results, flagged as an estimate
+    assert events.next_earnings([date(2025, 11, 20), date(2026, 5, 21), date(2026, 8, 20)], today) == ("2026-11-19", True)
+    assert events.next_earnings([date(2024, 3, 1)], today) == (None, False)
+    assert events.next_earnings([], today) == (None, False)
 
 
 def test_tech_themes_exist():

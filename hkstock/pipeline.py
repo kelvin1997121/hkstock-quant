@@ -232,9 +232,11 @@ def run(m: Market, use_news: bool = True, use_ai: bool = True, save: bool = True
     for t, st in stocks.items():
         e = cal.get(t, {})
         st["earnings"], st["ex_div"] = e.get("earnings"), e.get("ex_div")
+        st["earnings_est"] = bool(e.get("earnings_est"))
         st["earn_days"] = events.days_until(e.get("earnings"), data.local_now(m).date())
     for p in short_picks + long_picks + tech_picks + [x for g in sector_best for x in g["picks"]]:
         p["earnings"], p["earn_days"] = stocks[p["ticker"]]["earnings"], stocks[p["ticker"]]["earn_days"]
+        p["earnings_est"] = stocks[p["ticker"]]["earnings_est"]
     all_names = {**names, **m.extras}
     upcoming = events.upcoming(cal, all_names, 7, data.local_now(m).date())
     # log only on the session that produced today's bar: on a holiday the latest bar is an older day,

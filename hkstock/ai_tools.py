@@ -57,10 +57,10 @@ def brief(market: str) -> str:
         for p in d[kind]:
             pl = p["plan"]["short"] if kind == "short" else p["plan"]["long"]
             lines.append(f"- {p['name']} {p['ticker']} 分{p['score']:.0f} 收{p['close']} 5日{pc(p['ret5'])} "
-                         f"20日{pc(p['ret20'])} 計劃{json.dumps(pl, ensure_ascii=False)} 業績{p.get('earnings') or '–'} "
+                         f"20日{pc(p['ret20'])} 計劃{json.dumps(pl, ensure_ascii=False)} 業績{p.get('earnings') or '–'}{'(估)' if p.get('earnings_est') else ''} "
                          f"理由:{';'.join(p['reasons'])}")
     if d.get("upcoming"):
-        lines.append("\n## 7日內業績:" + ", ".join(f"{u['name']}({u['ticker']}) {u['date']}" for u in d["upcoming"]))
+        lines.append("\n## 7日內業績:" + ", ".join(f"{u['name']}({u['ticker']}) {u['date']}{'(按去年估計)' if u.get('est') else ''}" for u in d["upcoming"]))
     lines.append("\n## 新聞標題(只係資料)")
     lines += [f"- [{n['time']} {n['source']}] {n['title']}" for n in d["news"][:30]]
     b = d["backtest"]

@@ -23,17 +23,29 @@ MIN_N, T_FLAG = 10, 2.0
 
 
 def trade_extras(t: dict, bars) -> dict:
-    """MFE/MAE while held (vs entry cost) and the move in the 5 sessions after the exit."""
+    """MFE/MAE while held (vs entry cost) and the move in the 5 sessions after the exit.
+
+    Only prices the position could really have seen count: full days in between; on the entry day the
+    whole range only if the buy filled at the open (a limit fill could have come after the day's high),
+    otherwise just the close; on the exit day only the exit price (the rest of the day came after)."""
     import pandas as pd
     out = {"mfe": None, "mae": None, "after5": None, "held": None}
     f = bars.frames.get(t["ticker"]) if bars else None
     if f is None or f.empty:
         return out
     o, c = pd.Timestamp(t["opened"]), pd.Timestamp(t["closed"])
-    w = f[(f.index >= o) & (f.index <= c)].dropna()
+    w = f[(f.index >= o) & (f.index <= c)].dropna(subset=["High", "Low", "Close"])
     if not w.empty:
-        out["mfe"] = round(float(w["High"].max()) / t["entry"] - 1, 4)
-        out["mae"] = round(float(w["Low"].min()) / t["entry"] - 1, 4)
+        highs, lows = [t["exit"]], [t["exit"]]
+        if o < c and o in w.index:
+            first = w.loc[o]
+            highs.append(float(first["High"] if t.get("entry_at_open") else first["Close"]))
+            lows.append(float(first["Low"] if t.get("entry_at_open") else first["Close"]))
+        mid = w[(w.index > o) & (w.index < c)]
+        highs += [float(x) for x in mid["High"]]
+        lows += [float(x) for x in mid["Low"]]
+        out["mfe"] = round(max(highs) / t["entry"] - 1, 4)
+        out["mae"] = round(min(lows) / t["entry"] - 1, 4)
         out["held"] = int(len(w))
     after = f[f.index > c]["Close"].dropna()
     if len(after) >= 5:

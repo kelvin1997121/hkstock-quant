@@ -168,17 +168,21 @@ def book(tmp_path, monkeypatch):
     monkeypatch.setattr(paper, "VIEW", tmp_path / "docs" / "paper.json")
     monkeypatch.setattr(paper, "ORDERS", tmp_path / "orders.json")
     monkeypatch.setattr(paper, "LOTS", tmp_path / "lots.json")
+    monkeypatch.setattr(paper, "_correlations", lambda t, others: {})          # offline
     return tmp_path
 
 
 def test_order_checks(book):
     with pytest.raises(SystemExit, match="倍數"):
-        paper.place_order("0700.HK", "buy", 150, stop=380, reason="測試每手")
+        paper.place_order("0700.HK", "buy", 150, stop=390, reason="測試每手")
     with pytest.raises(SystemExit, match="止蝕"):
         paper.place_order("0700.HK", "buy", 100, reason="冇止蝕測試")
-    paper.place_order("0700.HK", "buy", 100, stop=380, reason="一手 4 萬,准許")          # 40% via the one-lot rule
+    with pytest.raises(SystemExit, match="風險太大"):                                   # 100 x 20 = 2% of equity
+        paper.place_order("0700.HK", "buy", 100, stop=380, reason="止蝕太闊")
+    e = paper.place_order("0700.HK", "buy", 100, stop=390, reason="一手 4 萬,准許")      # 40% via the one-lot rule
+    assert e["check"]["risk_hkd"] == 1000 and e["check"]["size_pct"] == 0.4
     with pytest.raises(SystemExit, match="上限"):                                       # same-run order counts
-        paper.place_order("0700.HK", "buy", 100, stop=380, reason="再買一手")
+        paper.place_order("0700.HK", "buy", 100, stop=390, reason="再買一手")
     paper.place_order("AAPL", "buy", 10, stop=290, reason="2.3 萬港元")
     with pytest.raises(SystemExit, match="上限"):
         paper.place_order("AAPL", "buy", 1, stop=290, reason="2.3 萬 + 2340 > 2.5 萬")
@@ -208,8 +212,22 @@ def test_closed_trade_carries_setup_context_and_r():
     assert t["id"] == 1 and t["setup"] == "突破" and t["ctx"]["regime"] == "偏好"
     assert -1.25 < t["r"] < -1.0                       # a stop-out loses about 1R, a bit more after costs
     x = paper_learn.trade_extras(t, b)
-    assert x["mae"] == pytest.approx(93 / t["entry"] - 1, abs=1e-4)
+    # the exit day's low of 93 came after the stop sold at 95: only the exit price counts that day
+    assert x["mae"] == pytest.approx(95 * 0.999 / t["entry"] - 1, abs=1e-4)
+    assert x["mfe"] == pytest.approx(102 / t["entry"] - 1, abs=1e-4)   # bought at the open: whole first day counts
     assert x["after5"] is not None and x["held"] == 2
+
+
+def test_mfe_ignores_the_entry_days_high_for_a_limit_fill():
+    e = [order(1, "2026-11-02T00:30:00Z", "0700.HK", limit=99.0, stop=90.0),
+         order(2, "2026-11-03T09:00:00Z", "0700.HK", side="sell")]
+    b = bars({"0700.HK": {"2026-11-02": (100, 110, 97, 100), "2026-11-04": (101, 103, 100, 102)}})
+    final, _ = run(e, b, datetime(2026, 11, 13, 0, 0, tzinfo=UTC))
+    t = final["trades"][0]
+    assert t["entry_at_open"] is False
+    x = paper_learn.trade_extras(t, b)
+    # the 110 high may have come before the 99 limit fill; the first day counts only at its close (100)
+    assert x["mfe"] == pytest.approx(max(100, 102, 98 * 1.02, 101 * 0.9995) / t["entry"] - 1, abs=1e-4)
 
 
 def _trades(n, r, setup="突破"):
@@ -250,3 +268,84 @@ def test_earnings_group_keeps_today_and_unknown_apart():
     assert label(0) == "7日內有業績" and label(7) == "7日內有業績"
     assert label(30) == "7日後先有業績"
     assert label(None) == "無數據" and label(-14) == "無數據"
+
+
+def _with_actions(b, ticker, day, div=0.0, split=0.0):
+    f = b.frames[ticker]
+    f["Dividends"], f["Stock Splits"] = 0.0, 0.0
+    f.loc[pd.Timestamp(day), ["Dividends", "Stock Splits"]] = [div, split]
+    return b
+
+
+def test_dividend_is_credited_to_holders_and_counts_in_the_trade():
+    e = [order(1, "2026-11-02T00:30:00Z", "0700.HK", stop=90.0),
+         order(2, "2026-11-04T09:00:00Z", "0700.HK", side="sell")]               # sold at the 11-05 open
+    b = _with_actions(bars(), "0700.HK", "2026-11-04", div=2.0)
+    final, _ = run(e, b, datetime(2026, 11, 6, 0, 0, tzinfo=UTC))
+    d = final["dividends"][0]
+    assert d["kind"] == "div" and d["net_hkd"] == pytest.approx(200.0)
+    t = final["trades"][0]
+    assert t["div_hkd"] == pytest.approx(200.0)
+    no_div, _ = run(e, bars(), datetime(2026, 11, 6, 0, 0, tzinfo=UTC))
+    assert t["pnl_hkd"] == pytest.approx(no_div["trades"][0]["pnl_hkd"] + 200.0)
+    assert final["cash"] == pytest.approx(no_div["cash"] + 200.0)
+
+
+def test_no_dividend_when_bought_on_the_ex_date_and_us_tax_withheld():
+    hk = [order(1, "2026-11-03T09:00:00Z", "0700.HK", stop=90.0)]               # first fills at the 11-04 open
+    final, _ = run(hk, _with_actions(bars(), "0700.HK", "2026-11-04", div=2.0), datetime(2026, 11, 5, 0, 0, tzinfo=UTC))
+    assert not final["dividends"]
+    us = [order(1, "2026-11-02T09:30:00Z", "AAPL", shares=10, stop=90.0)]
+    final, _ = run(us, _with_actions(bars(), "AAPL", "2026-11-04", div=1.0), datetime(2026, 11, 6, 0, 0, tzinfo=UTC))
+    assert final["dividends"][0]["net_hkd"] == pytest.approx(10 * 1.0 * 0.7 * 7.8)
+
+
+def test_split_rescales_the_position_and_cancels_waiting_orders():
+    e = [order(1, "2026-11-02T00:30:00Z", "0700.HK", stop=90.0, target=120.0),
+         order(2, "2026-11-03T09:00:00Z", "0700.HK", limit=95.0, stop=90.0, days=3)]
+    after = {d: (50, 51, 49, 50) for d in ("2026-11-04", "2026-11-05", "2026-11-06")}   # prices after the split
+    b = _with_actions(bars({"0700.HK": after}), "0700.HK", "2026-11-04", split=2.0)
+    final, _ = run(e, b, datetime(2026, 11, 5, 0, 0, tzinfo=UTC))
+    p = final["positions"]["0700.HK"]
+    assert p["shares"] == 200 and p["stop"] == pytest.approx(45.0) and p["target"] == pytest.approx(60.0)
+    assert final["orders"]["2"]["status"] == "cancelled"
+
+
+def test_next_ex_dividend_estimate():
+    from datetime import date
+    today = date(2026, 11, 12)
+    hist = {date(2025, 12, 4): 0.156, date(2026, 5, 4): 0.194, date(2026, 10, 9): 0.177}
+    assert paper.next_ex_dividend(hist, "2026-10-09", today) == {"date": "2026-12-03", "est": True, "per_share": 0.156}
+    assert paper.next_ex_dividend(hist, "2026-11-20", today)["est"] is False
+    assert paper.next_ex_dividend({date(2026, 3, 1): 1.0}, None, today) is None
+
+
+def test_theme_correlation_and_cash_limits(book, monkeypatch):
+    import json
+    stocks = {t: {"name": t, "close": 100.0, "theme": th} for t, th in
+              (("AMD", "AI晶片"), ("NVDA", "AI晶片"), ("AVGO", "AI晶片"), ("KO", "消費"), ("PEP", "消費"), ("XOM", "能源"))}
+    (book / "docs" / "us.json").write_text(json.dumps({"stocks": stocks}))
+    paper.place_order("AMD", "buy", 25, stop=95, reason="AI 晶片第一隻")                 # 19.5k
+    paper.place_order("NVDA", "buy", 25, stop=95, reason="同板塊第二隻")                 # 39k in the theme
+    with pytest.raises(SystemExit, match="板塊太集中"):
+        paper.place_order("AVGO", "buy", 10, stop=95, reason="第三隻超過 40%")
+    monkeypatch.setattr(paper, "_correlations", lambda t, others: {"AMD": 0.8, "NVDA": 0.7})
+    with pytest.raises(SystemExit, match="走勢太相似"):
+        paper.place_order("XOM", "buy", 10, stop=95, reason="唔同板塊但走勢一樣")
+    monkeypatch.setattr(paper, "_correlations", lambda t, others: {})
+    paper.place_order("KO", "buy", 25, stop=95, reason="消費 19.5k")
+    paper.place_order("XOM", "buy", 25, stop=95, reason="能源 19.5k")
+    with pytest.raises(SystemExit, match="10% 現金"):                                  # 78k out, 15.6k more leaves 6k
+        paper.place_order("PEP", "buy", 20, stop=98, reason="用到剩唔夠一成現金")
+
+
+def test_exit_reason_cannot_claim_a_locked_profit_below_cost(book):
+    import json
+    view = json.loads((book / "docs" / "paper.json").read_text())
+    view["positions"] = [{"ticker": "AAPL", "shares": 2, "cost": 1061.0, "last": 1087.6}]
+    (book / "docs" / "paper.json").write_text(json.dumps(view))
+    with pytest.raises(SystemExit, match="低過成本"):
+        paper.set_exit("AAPL", stop=1055.0, reason="上移止蝕鎖定盈利")
+    e = paper.set_exit("AAPL", stop=1055.0, reason="上移止蝕減少風險")
+    assert e["check"]["stop_vs_cost"] < 0 and e["check"]["pnl_at_stop_hkd"] < 0
+    assert paper.set_exit("AAPL", stop=1062.0, reason="上移止蝕保本")["check"]["stop_vs_cost"] > 0
