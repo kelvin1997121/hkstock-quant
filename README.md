@@ -44,7 +44,7 @@
 |---|---|
 | 分析更新 | `.github/workflows/ticker.yml` 喺交易時段(港股 08:30–16:45 HKT、美股 08:30–16:50 紐約時間)每 15 分鐘觸發 `update.yml`;GitHub 自己嘅定時只係後備 |
 | 假期 | `hkstock/market_days.py` 收錄 2026–2027 港美股假期同半日市,假期唔分析、唔記錄(2028 前要更新,測試會提醒) |
-| 自我檢查 | 每次更新先跑 `tests/`(58 個測試),唔過就唔發佈 |
+| 自我檢查 | 每次更新先跑 `tests/`(61 個測試),唔過就唔發佈 |
 | 數據把關 | `hkstock/quality.py`:指數冇價、股票少咗兩成、指數單日 ±30%、數據日期倒退 → 該市場今次唔更新,保留舊數據 |
 | 失敗通知 | 更新失敗會開 GitHub issue(GitHub email 通知),恢復後自動關閉 |
 | 套件升級 | `.github/dependabot.yml` 每星期六檢查新版本,以 PR 形式出現,`tests.yml` 自動測試,**要人手合併**;`requirements.txt` 有大版本上限 |

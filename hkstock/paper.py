@@ -11,11 +11,14 @@ Who writes which file (two writers never touch the same file, so git rebases nev
 Fill rules (an order only ever uses prices from sessions that opened after it was placed):
   - An order works from the first session of its market that opens after the order time, for `days`
     sessions (default 1), then expires.
-  - Market order: that session's open, plus slippage. Limit buy: fills if low <= limit, at min(open, limit).
-    Limit sell: fills if high >= limit, at max(open, limit).
+  - Market order: that session's open, plus slippage. Limit buy: fills at the open if the open is at or
+    below the limit, otherwise at the limit only if the low went below it. A low that merely touches the
+    limit does not fill: other orders queued at that price first, so a real fill is not assured.
+    Limit sell: the mirror image (open at or above the limit, or a high above it).
   - A buy carries a stop (required) and optional target for the whole position, checked from the fill
-    day on: low <= stop -> sold at min(open, stop) less slippage; high >= target -> sold at
-    max(open, target). Both in one day counts as the stop (daily bars cannot show which came first).
+    day on: low <= stop -> sold at min(open, stop) less slippage; target works like a limit sell
+    (open at or above it, or a high above it). Both in one day counts as the stop (daily bars cannot
+    show which came first).
   - Within a session: control entries (cancel/exit), then sells, then buys, then stop/target checks.
   - No margin and no short selling: a buy is cut to what the cash pays for (whole board lots in HK),
     or rejected.
@@ -65,7 +68,8 @@ INDEX = {"hk": "^HSI", "us": "^GSPC"}
 STOCK_FILES = {"hk": "data.json", "us": "us.json"}
 RULES = ("起始資金 10 萬港元;港股美股共用現金(美元按當日匯率);唔可以借錢或者沽空;"
          f"每隻股票落單時最多佔資產 {MAX_POSITION:.0%}(港股每手太大嘅可以買一手,最多 {MAX_ONE_LOT:.0%});買入一定要有止蝕;"
-         "落單後由下一個開市時段先生效,用真實開市價/最高/最低價成交;費用按富途收費估算。")
+         "落單後由下一個開市時段先生效,用真實開市價/最高/最低價成交;限價單同目標價要開市價已經去到,"
+         "或者全日最低(沽出就係最高)穿過咗限價先算成交,啱啱掂到唔計;費用按富途收費估算。")
 
 
 # ---------------------------------------------------------------- basics
@@ -307,12 +311,7 @@ def step(st: dict, session: tuple, entries: list[dict], bars: Bars, final: bool,
             continue
         lim = e.get("limit")
         if e["side"] == "buy":
-            if lim is None:
-                px = b["o"] * (1 + SLIP[m])
-            elif b["l"] <= lim:
-                px = min(b["o"], lim)
-            else:
-                px = None
+            px = b["o"] * (1 + SLIP[m]) if lim is None else _limit_buy(b, lim)
             if px is not None:
                 ok, note = _fill_buy(st, {**e, "lot": e.get("lot", 1)}, px, m, d, fx, f"單號 {e['id']}")
                 o["status"], o["note"] = ("filled", note) if ok else ("rejected", note)
@@ -322,12 +321,7 @@ def step(st: dict, session: tuple, entries: list[dict], bars: Bars, final: bool,
             if not p:
                 o["status"], o["note"] = "rejected", "冇持倉(可能已經止蝕或到目標)"
                 continue
-            if lim is None:
-                px = b["o"] * (1 - SLIP[m])
-            elif b["h"] >= lim:
-                px = max(b["o"], lim)
-            else:
-                px = None
+            px = b["o"] * (1 - SLIP[m]) if lim is None else _limit_sell(b, lim)
             if px is not None:
                 n = min(e["shares"], p["shares"])
                 _fill_sell(st, e["ticker"], n, px, m, d, fx, f"單號 {e['id']}")
@@ -347,8 +341,25 @@ def step(st: dict, session: tuple, entries: list[dict], bars: Bars, final: bool,
         stop, target = p.get("stop"), p.get("target")
         if stop is not None and b["l"] <= stop:
             _fill_sell(st, t, p["shares"], min(b["o"], stop) * (1 - SLIP[m]), m, d, fx, "止蝕")
-        elif target is not None and b["h"] >= target:
-            _fill_sell(st, t, p["shares"], max(b["o"], target), m, d, fx, "到目標")
+        elif target is not None and _limit_sell(b, target) is not None:
+            _fill_sell(st, t, p["shares"], _limit_sell(b, target), m, d, fx, "到目標")
+
+
+def _limit_buy(b: dict, lim: float):
+    """Fill price for a limit buy on bar b, or None. Open at/below the limit fills at the open; otherwise
+    the low has to go below the limit (a touch is not enough: earlier orders at that price come first)."""
+    eps = lim * 1e-6
+    if b["o"] <= lim + eps:
+        return b["o"]
+    return lim if b["l"] < lim - eps else None
+
+
+def _limit_sell(b: dict, lim: float):
+    """Mirror of _limit_buy for limit sells and targets."""
+    eps = lim * 1e-6
+    if b["o"] >= lim - eps:
+        return b["o"]
+    return lim if b["h"] > lim + eps else None
 
 
 def advance(state: dict, entries: list[dict], bars: Bars, now: datetime) -> tuple[dict, dict]:

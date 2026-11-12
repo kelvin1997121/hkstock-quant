@@ -102,6 +102,25 @@ def test_limit_buy_expires_when_not_reached():
     assert final["orders"]["1"]["status"] == "expired" and not final["fills"]
 
 
+def test_limit_needs_the_price_to_trade_through_not_just_touch():
+    now = datetime(2026, 11, 3, 0, 0, tzinfo=UTC)
+    e = [order(1, "2026-11-02T00:30:00Z", "0700.HK", limit=98.0, stop=90.0)]
+    touch, _ = run(e, bars({"0700.HK": {"2026-11-02": (100, 101, 98.0, 99)}}), now)   # low exactly at the limit
+    assert touch["orders"]["1"]["status"] == "expired" and not touch["fills"]
+    through, _ = run(e, bars({"0700.HK": {"2026-11-02": (100, 101, 97.9, 99)}}), now)
+    assert through["fills"][0]["price"] == pytest.approx(98.0)
+    gap, _ = run(e, bars({"0700.HK": {"2026-11-02": (96, 99, 95, 97)}}), now)         # opened below the limit
+    assert gap["fills"][0]["price"] == pytest.approx(96.0)
+
+
+def test_target_needs_a_high_above_it():
+    e = [order(1, "2026-11-02T00:30:00Z", "0700.HK", stop=90.0, target=105.0)]
+    touch, _ = run(e, bars({"0700.HK": {"2026-11-03": (101, 105.0, 100, 104)}}), datetime(2026, 11, 4, 0, 0, tzinfo=UTC))
+    assert "0700.HK" in touch["positions"]
+    hit, _ = run(e, bars({"0700.HK": {"2026-11-03": (101, 105.5, 100, 104)}}), datetime(2026, 11, 4, 0, 0, tzinfo=UTC))
+    assert hit["trades"][0]["why"] == "到目標" and hit["trades"][0]["exit"] == pytest.approx(105.0)
+
+
 def test_buy_is_cut_to_whole_lots_the_cash_pays_for():
     e = [order(1, "2026-11-02T00:30:00Z", "0700.HK", shares=2000, stop=90.0)]   # HK$200k wanted, HK$100k cash
     final, _ = run(e, bars(), datetime(2026, 11, 3, 0, 0, tzinfo=UTC))
@@ -223,3 +242,11 @@ def test_lessons_need_evidence_before_adoption(book):
     paper.add_review(2, "止蝕太近,開市波動已經掃走")
     with pytest.raises(SystemExit, match="檢討過"):
         paper.add_review(2, "再寫一次檢討應該唔得")
+
+
+def test_earnings_group_keeps_today_and_unknown_apart():
+    key = paper_learn.DIMENSIONS["業績"]
+    label = lambda d: key({"ctx": {"earn_days": d}})
+    assert label(0) == "7日內有業績" and label(7) == "7日內有業績"
+    assert label(30) == "7日後先有業績"
+    assert label(None) == "無數據" and label(-14) == "無數據"

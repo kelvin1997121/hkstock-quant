@@ -50,6 +50,13 @@ def _band(v, cuts, labels):
     return labels[-1]
 
 
+def _earnings(days) -> str:
+    """Days to the next results date. None (no date) and past dates are not the same as 'no results soon'."""
+    if days is None or days < 0:
+        return "無數據"
+    return "7日內有業績" if days <= 7 else "7日後先有業績"
+
+
 DIMENSIONS = {
     "買入類型": lambda t: t.get("setup") or "其他",
     "市場": lambda t: "港股" if t.get("market") == "hk" else "美股",
@@ -58,7 +65,7 @@ DIMENSIONS = {
     "短炒分": lambda t: _band((t.get("ctx") or {}).get("short_score"), (50, 75), ("50以下", "50-75", "75以上")),
     "RSI": lambda t: _band((t.get("ctx") or {}).get("rsi"), (50, 70), ("50以下", "50-70", "70以上")),
     "長線趨勢": lambda t: {True: "200天線上", False: "200天線下"}.get((t.get("ctx") or {}).get("above_ma200"), "無數據"),
-    "業績": lambda t: "7日內有業績" if 0 <= ((t.get("ctx") or {}).get("earn_days") or 99) <= 7 else "冇",
+    "業績": lambda t: _earnings((t.get("ctx") or {}).get("earn_days")),
     "點樣平倉": lambda t: t["why"] if t["why"] in ("止蝕", "到目標") else "自己沽",
 }
 
