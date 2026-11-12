@@ -2,7 +2,7 @@
 # Dependabot (.github/dependabot.yml) opens a pull request when a newer version is out;
 # the tests workflow runs on it, and it is merged by hand only when the tests pass.
 yfinance>=1.8,<2
-pandas>=2.2,<4
+pandas>=3.1.1,<4
 numpy>=1.26,<3
 requests>=2.31,<3
 feedparser>=6.0,<7
