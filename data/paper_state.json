@@ -1,8 +1,8 @@
 {
  "start": "2026-11-10T07:02:10Z",
  "capital": 100000.0,
- "through": "2026-11-11T14:30:00Z",
- "cash": 52876.925344886775,
+ "through": "2026-11-12T01:30:00Z",
+ "cash": 28325.495344886775,
  "positions": {
   "COST": {
    "shares": 2,
@@ -29,8 +29,8 @@
     "stop_pct": -0.0347
    },
    "risk": 37.804999999999836,
-   "stop": 1023.19,
-   "target": 1093.14
+   "stop": 1055.0,
+   "target": 1131.28
   },
   "0003.HK": {
    "shares": 2000,
@@ -87,6 +87,34 @@
    "risk": 0.40952000000000055,
    "stop": 7.46,
    "target": 8.42
+  },
+  "1113.HK": {
+   "shares": 500,
+   "cost": 49.10286,
+   "market": "hk",
+   "opened": "2026-11-12",
+   "reason": "長實突破20日新高,5日升7.2%,資金流入;買區內限價,一手佔約25%,風險約825港元",
+   "order": 2,
+   "setup": "突破",
+   "ctx": {
+    "market": "hk",
+    "regime": "偏好",
+    "regime_score": 22,
+    "theme": "本地地產",
+    "theme_verdict": "觀望",
+    "short_score": 86.0,
+    "long_score": 87.0,
+    "rsi": 75.0,
+    "ret5": 0.0722,
+    "ret20": 0.1149,
+    "above_ma50": true,
+    "above_ma200": true,
+    "earn_days": -89,
+    "stop_pct": -0.0337
+   },
+   "risk": 1.7528599999999983,
+   "stop": 47.35,
+   "target": 51.85
   }
  },
  "orders": {
@@ -96,7 +124,7 @@
    "note": ""
   },
   "2": {
-   "status": "pending",
+   "status": "filled",
    "seen": 1,
    "note": ""
   },
@@ -106,9 +134,9 @@
    "note": ""
   },
   "4": {
-   "status": "pending",
-   "seen": 1,
-   "note": ""
+   "status": "expired",
+   "seen": 2,
+   "note": "未到限價"
   },
   "5": {
    "status": "filled",
@@ -146,10 +174,20 @@
    "fee_hkd": 39.04,
    "fx": 7.8449,
    "why": "單號 3"
+  },
+  {
+   "date": "2026-11-12",
+   "ticker": "1113.HK",
+   "side": "buy",
+   "shares": 500,
+   "price": 49.0,
+   "fee_hkd": 51.43,
+   "fx": 7.8445,
+   "why": "單號 2"
   }
  ],
  "trades": [],
- "fees": 92.31095272064209,
+ "fees": 143.7409527206421,
  "history": {
   "2026-11-10": {
    "equity": 100049.19,
@@ -160,7 +198,7 @@
    "bench": 100539.82
   },
   "2026-11-12": {
-   "equity": 100588.36,
+   "equity": 100589.01,
    "bench": 99997.76
   }
  }
