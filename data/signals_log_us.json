@@ -110,5 +110,33 @@
    "PM",
    "V"
   ]
+ },
+ "2026-11-13": {
+  "regime_score": -10,
+  "label": "震盪",
+  "short": [
+   "JNJ",
+   "LLY",
+   "COST",
+   "MO",
+   "TME",
+   "HD",
+   "WMT",
+   "BRK-B",
+   "TSLA",
+   "ABBV"
+  ],
+  "long": [
+   "MO",
+   "ABBV",
+   "AAPL",
+   "CVX",
+   "MRK",
+   "JNJ",
+   "PFE",
+   "V",
+   "XOM",
+   "COP"
+  ]
  }
 }
