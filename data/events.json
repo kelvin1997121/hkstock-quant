@@ -147,10 +147,10 @@
 "v": 2
 },
 "0823.HK": {
-"earnings": "2026-11-12",
+"earnings": null,
 "earnings_est": false,
 "ex_div": "2026-06-11",
-"fetched": "2026-11-12",
+"fetched": "2026-11-13",
 "v": 2
 },
 "0857.HK": {
@@ -189,10 +189,10 @@
 "v": 2
 },
 "0981.HK": {
-"earnings": "2026-11-12",
-"earnings_est": false,
+"earnings": "2027-02-09",
+"earnings_est": true,
 "ex_div": null,
-"fetched": "2026-11-12",
+"fetched": "2026-11-13",
 "v": 2
 },
 "0992.HK": {
