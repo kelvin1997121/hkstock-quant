@@ -1,8 +1,8 @@
 {
  "start": "2026-11-10T07:02:10Z",
  "capital": 100000.0,
- "through": "2026-11-12T14:30:00Z",
- "cash": 28325.495344886775,
+ "through": "2026-11-13T01:30:00Z",
+ "cash": 16391.915344886773,
  "positions": {
   "COST": {
    "shares": 2,
@@ -115,6 +115,35 @@
    "risk": 1.7528599999999983,
    "stop": 47.35,
    "target": 51.85
+  },
+  "1929.HK": {
+   "shares": 1000,
+   "cost": 11.93358,
+   "market": "hk",
+   "opened": "2026-11-13",
+   "reason": "周大福升勢穩,一個月升12%,收市近買區上沿;限價11.9回調入,止蝕11.46,風險約440港元,業績11月24日未臨近",
+   "order": 11,
+   "setup": "回調",
+   "ctx": {
+    "market": "hk",
+    "regime": "震盪",
+    "regime_score": -7,
+    "theme": "新消費",
+    "theme_verdict": "觀望",
+    "short_score": 77.0,
+    "long_score": 61.0,
+    "rsi": 66.0,
+    "ret5": 0.0042,
+    "ret20": 0.1209,
+    "above_ma50": true,
+    "above_ma200": true,
+    "earn_days": 12,
+    "stop_pct": -0.037
+   },
+   "entry_at_open": false,
+   "risk": 0.47357999999999834,
+   "stop": 11.46,
+   "target": 13.5
   }
  },
  "orders": {
@@ -144,7 +173,7 @@
    "note": ""
   },
   "11": {
-   "status": "pending",
+   "status": "filled",
    "seen": 0,
    "note": ""
   }
@@ -189,10 +218,20 @@
    "fee_hkd": 51.43,
    "fx": 7.8445,
    "why": "單號 2"
+  },
+  {
+   "date": "2026-11-13",
+   "ticker": "1929.HK",
+   "side": "buy",
+   "shares": 1000,
+   "price": 11.9,
+   "fee_hkd": 33.58,
+   "fx": 7.8454,
+   "why": "單號 11"
   }
  ],
  "trades": [],
- "fees": 143.7409527206421,
+ "fees": 177.32095272064208,
  "history": {
   "2026-11-10": {
    "equity": 100049.19,
@@ -207,7 +246,7 @@
    "bench": 99914.24
   },
   "2026-11-13": {
-   "equity": 100608.03,
+   "equity": 100609.56,
    "bench": 99056.63
   }
  }
