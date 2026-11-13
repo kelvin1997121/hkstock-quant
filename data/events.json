@@ -581,10 +581,10 @@
 "v": 2
 },
 "AMAT": {
-"earnings": "2026-11-12",
+"earnings": "2027-02-11",
 "earnings_est": false,
 "ex_div": "2026-11-19",
-"fetched": "2026-11-12",
+"fetched": "2026-11-13",
 "v": 2
 },
 "AMD": {
@@ -735,10 +735,10 @@
 "v": 2
 },
 "CSCO": {
-"earnings": "2026-11-12",
+"earnings": "2027-02-10",
 "earnings_est": false,
 "ex_div": "2026-10-02",
-"fetched": "2026-11-12",
+"fetched": "2026-11-13",
 "v": 2
 },
 "CVX": {
