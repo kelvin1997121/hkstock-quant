@@ -979,7 +979,9 @@ def brief() -> str:
              f"資產 {v['equity']:,.0f} 港元({pc(v['ret'])});基準(一半恒指一半標普){pc(v['bench_ret'])};"
              f"現金 {v['cash']:,.0f};已投資 {v['invested'] * 100:.0f}%;累計費用 {v['fees']:,.0f};USD/HKD {v['fx']}",
              f"規則:{v['rules']}",
-             f"統計:{json.dumps(v['stats'], ensure_ascii=False)}", "", "## 持倉"]
+             f"統計:{json.dumps(v['stats'], ensure_ascii=False)}",
+             "落單前兩個市場嘅數據都要讀:python3 -m hkstock.ai_tools brief --market hk 同 --market us"
+             "(傍晚嗰次都要讀美股,因為美股單今晚就生效)。", "", "## 持倉"]
     for p in v["positions"] or []:
         s = st.get(p["ticker"], {})
         vs = ""
