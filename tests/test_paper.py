@@ -349,3 +349,51 @@ def test_exit_reason_cannot_claim_a_locked_profit_below_cost(book):
     e = paper.set_exit("AAPL", stop=1055.0, reason="上移止蝕減少風險")
     assert e["check"]["stop_vs_cost"] < 0 and e["check"]["pnl_at_stop_hkd"] < 0
     assert paper.set_exit("AAPL", stop=1062.0, reason="上移止蝕保本")["check"]["stop_vs_cost"] > 0
+
+
+def test_plan_cannot_say_profit_is_locked_while_every_stop_is_below_cost(book):
+    import json
+    view = json.loads((book / "docs" / "paper.json").read_text())
+    view["positions"] = [{"ticker": "AAPL", "name": "蘋果", "shares": 2, "cost": 1061.0, "last": 1106.0, "stop": 1055.0}]
+    (book / "docs" / "paper.json").write_text(json.dumps(view))
+    with pytest.raises(SystemExit, match="低過成本"):
+        paper.add_plan("【持倉檢查】蘋果浮盈2.9%,止蝕1055已鎖住利潤。")
+    paper.add_plan("【持倉檢查】蘋果浮盈2.9%,止蝕1055仍低過成本0.6%,未鎖定利潤。")       # honest wording passes
+    paper.set_exit("AAPL", stop=1070.0, reason="上移止蝕到成本之上")                       # same run: stop now above cost
+    paper.add_plan("【持倉檢查】蘋果止蝕上移到1070,已鎖定利潤。")
+
+
+def test_benchmark_includes_index_fund_dividends():
+    b = bars(base={"0700.HK": 100.0, "^HSI": 25000.0, "^GSPC": 7000.0, "HKD=X": 7.8, "2800.HK": 25.0, "SPY": 700.0})
+    st = paper.new_state(START)
+    flat = paper.benchmark(st, b)
+    assert flat == pytest.approx(paper.CAPITAL)
+    _with_actions(b, "2800.HK", "2026-11-04", div=0.5)        # 2% of 25
+    _with_actions(b, "SPY", "2026-11-05", div=7.0)            # 1% of 700, 0.7% after withholding
+    assert paper.benchmark(st, b) == pytest.approx(paper.CAPITAL * (1 + (0.02 + 0.007) / 2))
+
+
+def test_download_asks_again_for_tickers_yahoo_dropped():
+    calls = []
+
+    def fetch(tickers, start):
+        calls.append(list(tickers))
+        ok = [t for t in tickers if not (t == "B" and len(calls) < 3)]      # B fails twice, then works
+        return {t: pd.DataFrame({"Close": [1.0]}, index=[pd.Timestamp("2026-11-02")]) for t in ok}
+
+    b = paper.download(["A", "B"], START.date(), fetch=fetch, pause=0)
+    assert set(b.frames) == {"A", "B"} and calls == [["A", "B"], ["B"], ["B"]]
+
+
+def test_session_waits_when_a_held_stock_has_no_bar():
+    """A failed download must not finalise the day: that would skip the stop check for good."""
+    e = [order(1, "2026-11-02T00:30:00Z", "0700.HK", stop=95.0)]
+    crash = {"2026-11-03": (97, 98, 93, 94)}                                 # stop at 95 is hit on 3 Nov
+    b = bars({"0700.HK": crash})
+    b.frames["0700.HK"] = b.frames["0700.HK"].drop(pd.Timestamp("2026-11-03"))          # bar missing in this run
+    final, live = run(e, b, datetime(2026, 11, 4, 0, 0, tzinfo=UTC))
+    assert final["through"] < "2026-11-03" and "0700.HK" in final["positions"]          # HK 3 Nov not finalised
+    final, _ = paper.advance(final, e, bars({"0700.HK": crash}), datetime(2026, 11, 4, 0, 15, tzinfo=UTC))
+    assert final["trades"][0]["why"] == "止蝕"                                # next run has the bar: stop taken
+    halted, _ = run(e, b, datetime(2026, 11, 6, 0, 0, tzinfo=UTC))           # still no bar two days on: a halt
+    assert halted["through"] > "2026-11-03" and "0700.HK" in halted["positions"]

@@ -124,6 +124,7 @@ button.tbtn{background:var(--chip);color:var(--ink);border:1px solid var(--borde
 
   <div class="card" id="claudecard" hidden>
     <h2>Claude 每日分析 <span class="badge" id="cby"></span></h2>
+    <div class="stale" id="cstale" role="status" hidden></div>
     <div class="analysis" id="claude"></div>
     <div class="pred" id="cpred"></div>
   </div>
@@ -234,11 +235,12 @@ button.tbtn{background:var(--chip);color:var(--ink);border:1px solid var(--borde
       <div class="sub">起始資金 10 萬港元(唔係真錢)。Claude 每個交易日 08:30 同 17:30 自己分析、自己落單買賣港股同美股。
         單落咗之後要等下一個開市時段先成交,用真實開市價、最高同最低價計,費用按富途收費估算,冇得睇住結果先揀。只供參考,唔係投資建議。</div>
       <div class="hsum" id="psum"></div>
-      <div class="legend"><span><i style="background:var(--s1)"></i>模擬倉資產</span><span><i style="background:var(--s2)"></i>基準:一半恒指、一半標普500</span></div>
+      <div class="legend"><span><i style="background:var(--s1)"></i>模擬倉資產</span><span><i style="background:var(--s2)"></i>基準:一半恒指、一半標普500(連股息)</span></div>
       <div id="pchart"></div>
     </div>
     <div class="card">
       <h2>Claude 策略筆記 <span class="badge" id="pplant"></span></h2>
+      <div class="stale" id="pstale" role="status" hidden></div>
       <div class="analysis" id="pplan"></div>
       <div id="pplans"></div>
     </div>
@@ -412,6 +414,30 @@ function inSession(key){
   if ((DATA[key]?.market?.holidays || []).includes(tzDate(tz))) return false;  // exchange holiday
   return hm >= 930 && hm <= (key === "hk" ? 1615 : 1605);
 }
+// Claude's cloud routine runs on weekdays at 08:30 and 17:30 HKT, with backup runs 2 and 4 hours later.
+// Says so when the latest slot has no analysis (mirrors routine_status in hkstock/ai_tools.py).
+function routineNote(now = Date.now()){
+  const last = DATA.ai && ((DATA.ai.hk || {}).updated || DATA.ai.updated);
+  if (!last) return "";
+  const hk = now + 8 * 3600e3, EARLY = 30 * 60e3;      // Hong Kong wall-clock time, held in UTC fields
+  const d0 = new Date(hk);
+  let slot = null;
+  for (let back = 0; back < 8 && slot == null; back++) {
+    const day = Date.UTC(d0.getUTCFullYear(), d0.getUTCMonth(), d0.getUTCDate() - back), dow = new Date(day).getUTCDay();
+    if (dow === 0 || dow === 6) continue;
+    for (const mins of [17 * 60 + 30, 8 * 60 + 30]) {
+      if (day + mins * 60e3 - EARLY <= hk) { slot = day + mins * 60e3; break; }
+    }
+  }
+  if (slot == null || Date.parse(last.replace(" ", "T") + ":00Z") >= slot - EARLY) return "";
+  const waited = (hk - slot) / 60e3, when = new Date(slot).toISOString().slice(5, 16).replace("T", " ");
+  if (waited < 45) return "";
+  return waited < 285
+    ? `⚠ Claude 原定 ${when} 嘅分析仲未做到(通常係帳戶用量上限),後備運行會喺 2 同 4 個鐘後再試。下面仲係 ${last} 嘅舊內容。`
+    : `⚠ Claude 原定 ${when} 嘅分析冇做到,連後備運行都失敗(通常係帳戶用量上限)。下面仲係 ${last} 嘅舊內容;呢段時間模擬倉冇人睇,只有止蝕同目標價照常生效。`;
+}
+function showRoutineNote(id){ const el = $(id), t = routineNote(); el.hidden = !t; el.textContent = t; }
+
 function checkStale(d){
   const el = $("stale"); if (!el || !d) return;
   const age = (Date.now() - new Date(d.updated.replace(" ", "T") + ":00+08:00")) / 60000;
@@ -468,6 +494,7 @@ function render(d){
   $("claudecard").hidden = !ai;
   if (ai) {
     $("cby").textContent = `更新:${ai.updated || DATA.ai.updated || ""}`;
+    showRoutineNote("cstale");
     $("claude").textContent = ai.text || "";
     const chips = [];
     if (ai.call) chips.push(`未來5日${esc(d.market.index_name)}:<b>${esc(ai.call)}</b>${ai.confidence != null ? `(信心 ${ai.confidence}%)` : ""}`);
@@ -661,6 +688,7 @@ function renderPaper(){
   const pl = p.plans;
   $("pplant").textContent = pl.length ? pl[0].placed + " HKT" : ""; $("pplant").hidden = !pl.length;
   $("pplan").textContent = pl.length ? pl[0].text : "Claude 未寫策略筆記(下一次 08:30 或 17:30 會寫)。";
+  showRoutineNote("pstale");
   $("pplans").innerHTML = pl.length > 1 ? `<details style="margin-top:8px"><summary class="sub">之前嘅筆記(${pl.length - 1})</summary>` +
     pl.slice(1).map(x => `<div class="sub" style="margin-top:8px"><b>${esc(x.placed)}</b></div><div class="analysis">${esc(x.text)}</div>`).join("") + `</details>` : "";
   $("ppos").innerHTML = pos.length ? `<tr><th>股票</th><th>股數</th><th>成本</th><th>現價</th><th>盈虧(港元)</th><th>市值(港元)</th><th>止蝕 / 目標</th><th>開倉</th><th class="l">買入理由</th></tr>` +

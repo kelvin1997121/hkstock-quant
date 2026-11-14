@@ -3,6 +3,8 @@
   python -m hkstock.ai_tools brief --market hk        # compact summary of today's data to read
   python -m hkstock.ai_tools publish --market hk --call 偏升 --confidence 60 \
          --picks 0700.HK,9988.HK --text-file analysis.md
+  python -m hkstock.ai_tools due                      # RUN or SKIP: has this time slot been done already?
+  python -m hkstock.ai_tools status                   # JSON: last publish, latest slot, late / missed
 
 publish writes docs/ai.json (shown on the page) and appends the call to
 data/claude_log.json, keyed by the data's as-of date, so tracking.py can score
@@ -23,6 +25,43 @@ FILES = {"hk": "data.json", "us": "us.json"}
 CALLS = ("偏升", "震盪", "偏跌")
 MAX_CHARS = 700  # prompt asks for 600; small allowance for headings
 HKT = timezone(timedelta(hours=8))
+
+# The cloud routine runs on weekdays at 08:30 and 17:30 HKT. Backup runs 2 and 4 hours later do the
+# work only when the scheduled run never published (on 13 Nov 2026 the 17:30 run was refused because
+# the account had hit its usage limit, and nothing noticed).
+SLOTS = ((8, 30), (17, 30))
+BACKUP_HOURS = (2, 4)
+EARLY = timedelta(minutes=30)        # a run may start slightly before its slot
+LATE = timedelta(minutes=45)         # after this the page says the run is late
+
+
+def latest_slot(now: datetime) -> datetime:
+    """The most recent scheduled run (weekday 08:30 or 17:30 HKT) that should have started by `now`."""
+    now = now.astimezone(HKT)
+    for back in range(8):
+        day = now.date() - timedelta(days=back)
+        if day.weekday() >= 5:
+            continue
+        for h, m in reversed(SLOTS):
+            s = datetime(day.year, day.month, day.day, h, m, tzinfo=HKT)
+            if s - EARLY <= now:
+                return s
+    raise RuntimeError("no slot in the last week")
+
+
+def routine_status(now: datetime | None = None, ai: dict | None = None) -> dict:
+    """Has the routine published since its latest slot? routineNote() in docs/index.html mirrors this."""
+    now = (now or datetime.now(HKT)).astimezone(HKT)
+    if ai is None:
+        p = DOCS / "ai.json"
+        ai = json.loads(p.read_text(encoding="utf-8")) if p.exists() else {}
+    last = (ai.get("hk") or {}).get("updated") or ai.get("updated")
+    slot = latest_slot(now)
+    done = bool(last) and datetime.strptime(last, "%Y-%m-%d %H:%M").replace(tzinfo=HKT) >= slot - EARLY
+    waited = now - slot
+    return {"last": last, "slot": slot.strftime("%Y-%m-%d %H:%M"), "done": done,
+            "late": not done and waited >= LATE,
+            "missed": not done and waited >= timedelta(hours=BACKUP_HOURS[-1]) + LATE}
 
 
 def _load(market: str) -> dict:
@@ -114,10 +153,18 @@ def main(argv: list[str]) -> None:
     p.add_argument("--confidence", type=int, required=True)
     p.add_argument("--picks", default="")
     p.add_argument("--text-file", required=True)
+    sub.add_parser("due")
+    sub.add_parser("status")
     a = ap.parse_args(argv)
+    sys.stdout.reconfigure(encoding="utf-8")
     if a.cmd == "brief":
-        sys.stdout.reconfigure(encoding="utf-8")
         print(brief(a.market))
+    elif a.cmd == "due":
+        s = routine_status()
+        print(f"SKIP: {s['slot']} 呢個時段已經做過(上次發佈 {s['last']})" if s["done"]
+              else f"RUN: {s['slot']} 呢個時段未做(上次發佈 {s['last']})")
+    elif a.cmd == "status":
+        print(json.dumps(routine_status(), ensure_ascii=False))
     else:
         text = Path(a.text_file).read_text(encoding="utf-8")
         picks = [t.strip() for t in a.picks.split(",") if t.strip()]

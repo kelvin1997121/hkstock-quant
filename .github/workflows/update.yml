@@ -113,6 +113,33 @@ jobs:
           for i in 1 2 3; do git pull --rebase -X theirs -q && git push && { pushed=1; break; }; sleep 5; done
           [ "$pushed" = 1 ] || { echo "::error::push failed 3 times"; exit 1; }
 
+      - name: Claude routine watchdog (issue + email when a scheduled analysis never ran)
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PYTHONIOENCODING: utf-8
+        run: |
+          git fetch -q origin main && git checkout -q origin/main -- docs/ai.json
+          status=$(python -m hkstock.ai_tools status)
+          echo "$status"
+          missed=$(echo "$status" | python -c "import json,sys; print(json.load(sys.stdin)['missed'])")
+          slot=$(echo "$status" | python -c "import json,sys; print(json.load(sys.stdin)['slot'])")
+          last=$(echo "$status" | python -c "import json,sys; print(json.load(sys.stdin)['last'])")
+          gh label create claude-routine-missed --color fbca04 --description "the scheduled Claude analysis did not run" --force >/dev/null 2>&1 || true
+          open=$(gh issue list --label claude-routine-missed --state open --json number --jq '.[0].number // empty')
+          if [ "$missed" = "True" ]; then
+            if [ -z "$open" ]; then
+              gh issue create --title "Claude 每日分析冇做到($slot)" --label claude-routine-missed --body "原定 $slot HKT 嘅 Claude 分析同模擬倉操作冇做到,2 個鐘同 4 個鐘後嘅後備運行都冇成功。上一次成功係 $last HKT。
+
+          最常見原因:Claude 帳戶去到用量上限(雲端排程同你平時用 Claude 共用同一個限額)。
+
+          網站數據更新唔受影響;模擬倉嘅止蝕同目標價照常生效,只係冇新分析、冇新落單。下一個時段做到之後,呢個 issue 會自動關閉。"
+            fi
+          elif [ -n "$open" ]; then
+            gh issue close "$open" --comment "Claude 已經重新做到分析(最新:$last HKT)。"
+          fi
+
       - name: Failure notice (open or update an issue; GitHub emails the owner)
         if: failure()
         env:

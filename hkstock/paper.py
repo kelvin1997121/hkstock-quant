@@ -46,8 +46,10 @@ import argparse
 import copy
 import json
 import math
+import re
 import sys
 import tempfile
+import time
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -77,6 +79,8 @@ MAX_REVIEW, MAX_LESSON = 300, 200
 MIN_ADOPT = 5           # a lesson needs this many supporting closed trades before it becomes a hard rule
 FX_DEFAULT = 7.8
 DIV_TAX = {"hk": 0.0, "us": 0.30}   # withholding on dividends for a Hong Kong resident
+BENCH_ETF = {"hk": "2800.HK", "us": "SPY"}   # their dividends stand in for the indexes' dividends
+LOCK_CLAIM = re.compile(r"(已經?|經已)\s*(鎖定|鎖住|鎖利|保本)")   # "profit is locked in" stated as done
 INDEX = {"hk": "^HSI", "us": "^GSPC"}
 STOCK_FILES = {"hk": "data.json", "us": "us.json"}
 RULES = ("起始資金 10 萬港元;港股美股共用現金(美元按當日匯率);唔可以借錢或者沽空;"
@@ -86,7 +90,8 @@ RULES = ("起始資金 10 萬港元;港股美股共用現金(美元按當日匯�
          "落單後由下一個開市時段先生效,用真實開市價/最高/最低價成交;限價單同目標價要開市價已經去到,"
          "或者全日最低(沽出就係最高)穿過咗限價先算成交,啱啱掂到唔計;費用按富途收費估算;"
          "除淨日前持有嘅股票會收股息(美股扣 30% 預扣稅,港股全數,H 股實際要扣 10% 未計),股息計入嗰單交易嘅盈虧;"
-         "拆股會自動調整股數、成本同止蝕。")
+         "拆股會自動調整股數、成本同止蝕。基準係一半恒指一半標普 500,加埋指數基金(盈富 2800、SPY)期間派嘅股息"
+         "(美股同樣扣 30%),同模擬倉收息嘅計法一致。")
 
 
 # ---------------------------------------------------------------- basics
@@ -197,6 +202,21 @@ class Bars:
         num = lambda k: float(r[k]) if k in f.columns and r[k] == r[k] and r[k] > 0 else 0.0
         return num("Dividends"), num("Stock Splits")
 
+    def dividends_since(self, ticker: str, d: date) -> list[tuple[float, float]]:
+        """(dividend per share, close before the ex-date) for every ex-date after `d`."""
+        import pandas as pd
+        f = self.frames.get(ticker)
+        if f is None or "Dividends" not in f.columns:
+            return []
+        close = f["Close"].dropna()
+        out = []
+        for ts, amt in f["Dividends"].items():
+            if ts > pd.Timestamp(d) and amt == amt and amt > 0:
+                prev = close[close.index < ts]
+                if len(prev) and prev.iloc[-1] > 0:
+                    out.append((float(amt), float(prev.iloc[-1])))
+        return out
+
     def last_close(self, ticker: str, upto: date | None = None):
         f = self.frames.get(ticker)
         if f is None:
@@ -215,22 +235,53 @@ class Bars:
         return v if v and 7.0 < v < 8.5 else FX_DEFAULT
 
 
-def download(tickers: list[str], start: date) -> Bars:
+def _fetch(tickers: list[str], start: date) -> dict:
     import pandas as pd
     import yfinance as yf
-    yf.set_tz_cache_location(tempfile.mkdtemp(prefix="yf_"))
-    df = yf.download(sorted(set(tickers)), start=start.isoformat(), auto_adjust=False, actions=True,
-                     progress=False, threads=True, group_by="column")
+    # threads off: the account needs a dozen tickers, and threaded downloads sometimes lose one to
+    # yfinance's "database is locked"
+    df = yf.download(tickers, start=start.isoformat(), auto_adjust=False, actions=True,
+                     progress=False, threads=False, group_by="column")
     frames = {}
     if df is None or df.empty:
-        return Bars(frames)
+        return frames
     if not isinstance(df.columns, pd.MultiIndex):
         df.columns = pd.MultiIndex.from_product([df.columns, tickers[:1]])
     for t in set(df.columns.get_level_values(1)):
         f = pd.DataFrame({k: df[(k, t)] for k in ("Open", "High", "Low", "Close", "Dividends", "Stock Splits")
                           if (k, t) in df.columns})
         f.index = pd.to_datetime(f.index).tz_localize(None).normalize()
-        frames[t] = f[~f.index.duplicated(keep="last")]
+        f = f[~f.index.duplicated(keep="last")]
+        if "Close" in f.columns and f["Close"].notna().any():
+            frames[t] = f
+    return frames
+
+
+def download(tickers: list[str], start: date, fetch=None, pause: float = 3.0) -> Bars:
+    """Daily bars for every ticker; anything Yahoo dropped is asked for again, one ticker at a time."""
+    import yfinance as yf
+    yf.set_tz_cache_location(tempfile.mkdtemp(prefix="yf_"))
+    fetch = fetch or _fetch
+    want = sorted(set(tickers))
+    try:
+        frames = fetch(want, start)
+    except Exception as e:
+        print(f"  prices: {e!r}")
+        frames = {}
+    for attempt in (1, 2):
+        missing = [t for t in want if t not in frames]
+        if not missing:
+            break
+        print(f"  prices: retry {attempt} for {', '.join(missing)}")
+        time.sleep(pause * attempt)
+        for t in missing:
+            try:
+                frames.update(fetch([t], start))
+            except Exception as e:
+                print(f"  prices {t}: {e!r}")
+    missing = [t for t in want if t not in frames]
+    if missing:
+        print(f"::warning::no prices for {', '.join(missing)}")
     return Bars(frames)
 
 
@@ -421,6 +472,16 @@ def _limit_sell(b: dict, lim: float):
     return lim if b["h"] > lim + eps else None
 
 
+def _needed(st: dict, m: str, entries: list[dict], open_t: datetime) -> list[str]:
+    """Tickers whose bar a session of market m needs: positions held, and orders that can fill in it."""
+    need = {t for t, p in st["positions"].items() if p["market"] == m}
+    for e in entries:
+        if e["type"] in ("buy", "sell") and market_of(e["ticker"]) == m and parse_t(e["t"]) < open_t \
+                and st["orders"].get(str(e["id"]), {"status": "pending"})["status"] == "pending":
+            need.add(e["ticker"])
+    return sorted(need)
+
+
 def advance(state: dict, entries: list[dict], bars: Bars, now: datetime) -> tuple[dict, dict]:
     """Returns (finished-session state to save, live state including sessions still in progress)."""
     entries = sorted((e for e in entries if parse_t(e["t"]) >= parse_t(state["start"])), key=lambda e: e["t"])
@@ -434,6 +495,13 @@ def advance(state: dict, entries: list[dict], bars: Bars, now: datetime) -> tupl
             break
         if bars.get(INDEX[m], d) is None and now - finished_at(m, d) < timedelta(days=2):
             break                      # Yahoo not caught up yet; keep it for the next run
+        gaps = [t for t in _needed(final, m, entries, open_t) if bars.get(t, d) is None]
+        if gaps and bars.get(INDEX[m], d) is not None and now - finished_at(m, d) < timedelta(days=2):
+            # a held or ordered stock has no bar although the market traded: a failed download, or a
+            # trading halt. Finalising now would skip its stop for good, so wait (the page still shows
+            # the session from the live state); after two days it is treated as a halt.
+            print(f"::warning::{d} {m} not finalised yet: no bar for {', '.join(gaps)}")
+            break
         # no index bar two days later = the market did not trade that day (e.g. typhoon)
         step(final, s, entries, bars, final=True, closed=bars.get(INDEX[m], d) is None)
         i += 1
@@ -482,25 +550,29 @@ def next_ex_dividend(history: dict, known: str | None, today: date) -> dict | No
     return {"date": guesses[0][0].isoformat(), "est": True, "per_share": guesses[0][1]} if guesses else None
 
 
-def dividend_outlook(tickers: list[str], today: date) -> dict:
+def dividend_outlook(tickers: list[str], today: date) -> tuple[dict, bool]:
+    """({ticker: next ex-dividend}, every ticker fetched?)."""
     import yfinance as yf
     cal = read_json(DATA / "events.json", {})
-    out = {}
+    out, complete = {}, True
     for t in tickers:
         try:
             s = yf.Ticker(t).dividends
             hist = {ts.date(): float(v) for ts, v in s.items() if v > 0} if s is not None else {}
         except Exception as e:
             print(f"  dividends {t}: {e!r}")
+            complete = False
             continue
         nxt = next_ex_dividend(hist, (cal.get(t) or {}).get("ex_div"), today)
         if nxt:
             out[t] = nxt
-    return out
+    return out, complete
 
 
 def benchmark(state: dict, bars: Bars) -> float | None:
-    """Half Hang Seng, half S&P 500, each from the open of its first session after the start."""
+    """Half Hang Seng, half S&P 500, each from the open of its first session after the start, plus the
+    dividends an index fund paid since then (yield of 2800.HK and SPY on each ex-date, US less the same
+    withholding as the account). Without them a dividend-collecting account would look better than it is."""
     start = parse_t(state["start"])
     parts = []
     for m in ("hk", "us"):
@@ -511,7 +583,8 @@ def benchmark(state: dict, bars: Bars) -> float | None:
             continue
         base = bars.get(INDEX[m], first[2])["o"]
         last, _ = bars.last_close(INDEX[m])
-        parts.append(last / base if last else 1.0)
+        income = sum(amt / px for amt, px in bars.dividends_since(BENCH_ETF[m], first[2])) * (1 - DIV_TAX[m])
+        parts.append((last / base if last else 1.0) + income)
     return state["capital"] * sum(parts) / 2
 
 
@@ -543,7 +616,8 @@ def build_view(final: dict, live: dict, entries: list[dict], bars: Bars, now: da
             r["ex_div"] = {**x, "drop": round(x["per_share"] / r["last"], 4) if x.get("per_share") else None}
     bench = benchmark(final, bars)
     history = dict(final.get("history", {}))
-    history[today.isoformat()] = {"equity": round(equity, 2), "bench": round(bench, 2) if bench else None}
+    if all(r["last_date"] for r in rows):       # a holding with no price is valued at cost: not a point to keep
+        history[today.isoformat()] = {"equity": round(equity, 2), "bench": round(bench, 2) if bench else None}
     final["history"] = history
     nm = names()
     orders = []
@@ -609,14 +683,21 @@ def update(now: datetime | None = None) -> dict:
         print(f"::warning::lot sizes not refreshed: {e!r}")
     state = read_json(STATE, None) or new_state(now)
     entries = read_json(ORDERS, {"entries": []})["entries"]
-    tickers = {e["ticker"] for e in entries if e.get("ticker")} | set(state["positions"]) | set(INDEX.values()) | {"HKD=X"}
+    tickers = ({e["ticker"] for e in entries if e.get("ticker")} | set(state["positions"]) | set(INDEX.values())
+               | set(BENCH_ETF.values()) | {"HKD=X"})
     bars = download(sorted(tickers), parse_t(state["start"]).date() - timedelta(days=10))
     final, live = advance(state, entries, bars, now)
-    try:
-        outlook = dividend_outlook(sorted(live["positions"]), now.astimezone(HKT).date())
-    except Exception as e:
-        print(f"::warning::dividend dates not fetched: {e!r}")
-        outlook = {}
+    # next ex-dividend dates: one Yahoo request per holding, so once a day (or when the holdings change)
+    today, held = now.astimezone(HKT).date().isoformat(), sorted(live["positions"])
+    cache = final.get("outlook") or {}
+    outlook = cache.get("data", {})
+    if cache.get("date") != today or cache.get("tickers") != held:
+        try:
+            outlook, complete = dividend_outlook(held, now.astimezone(HKT).date())
+            if complete:
+                final["outlook"] = {"date": today, "tickers": held, "data": outlook}
+        except Exception as e:
+            print(f"::warning::dividend dates not fetched: {e!r}")
     final, view = build_view(final, live, entries, bars, now, outlook)
     write_json(STATE, final)
     write_json(VIEW, view, compact=True)
@@ -829,6 +910,17 @@ def add_plan(text: str) -> dict:
     n = len("".join(text.split()))
     if not text.strip() or n > MAX_PLAN:
         raise SystemExit(f"策略筆記要有內容,唔多過 {MAX_PLAN} 字(而家 {n})")
+    pos = read_json(VIEW, {}).get("positions", [])
+    if LOCK_CLAIM.search(text) and pos:
+        stops = {p["ticker"]: p.get("stop") for p in pos}
+        for e in read_json(ORDERS, {"entries": []})["entries"]:       # stop changes made earlier in this run
+            if e["type"] == "exit" and e.get("stop") is not None and e.get("ticker") in stops:
+                stops[e["ticker"]] = e["stop"]
+        if not any(stops[p["ticker"]] is not None and stops[p["ticker"]] >= p["cost"] for p in pos):
+            facts = ";".join(f"{p.get('name', p['ticker'])} 止蝕 {stops[p['ticker']]} 低過成本 {p['cost']:.2f}"
+                            for p in pos if stops[p["ticker"]] is not None)
+            raise SystemExit("筆記寫已經鎖定盈利/保本,但冇一個持倉嘅止蝕高過成本:" + facts
+                             + "。照 brief 嘅數字寫(例如「止蝕仍低過成本 0.6%」),或者先上移止蝕")
     return _append({"type": "plan", "text": text.strip()})
 
 
@@ -890,8 +982,13 @@ def brief() -> str:
              f"統計:{json.dumps(v['stats'], ensure_ascii=False)}", "", "## 持倉"]
     for p in v["positions"] or []:
         s = st.get(p["ticker"], {})
+        vs = ""
+        if p.get("stop") is not None:
+            gap = p["stop"] / p["cost"] - 1
+            money = (p["stop"] - p["cost"]) * p["shares"] * (v["fx"] if p["market"] == "us" else 1.0)
+            vs = f"(系統計:止蝕{'高過' if gap >= 0 else '低過'}成本 {abs(gap) * 100:.1f}%,觸發盈虧約 {money:+,.0f} 港元)"
         lines.append(f"- {p['name']} {p['ticker']} {p['shares']}股 成本{p['cost']:.2f} 現價{p['last']} ({p['last_date']}) "
-                     f"盈虧{p['pnl_hkd']:+,.0f}港元 {pc(p['pnl_pct'])} 止蝕{p['stop']} 目標{p['target']} 開倉{p['opened']} "
+                     f"盈虧{p['pnl_hkd']:+,.0f}港元 {pc(p['pnl_pct'])} 止蝕{p['stop']}{vs} 目標{p['target']} 開倉{p['opened']} "
                      f"| 系統短炒計劃{json.dumps(s.get('plan', {}).get('short'), ensure_ascii=False)} RSI{s.get('rsi', 0):.0f} "
                      f"業績{s.get('earnings') or '–'}{'(估)' if s.get('earnings_est') else ''}"
                      + (f" 已收股息{p['div_hkd']:,.0f}港元" if p.get("div_hkd") else "")

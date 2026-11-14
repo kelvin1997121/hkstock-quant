@@ -193,3 +193,22 @@ def test_tech_themes_exist():
     for m in (HK, US):
         assert m.tech_themes, m.key
         assert set(m.tech_themes) <= set(m.themes), set(m.tech_themes) - set(m.themes)
+
+
+def test_routine_status_spots_a_missed_run():
+    from datetime import datetime
+    from hkstock import ai_tools
+    at = lambda s: datetime.strptime(s, "%Y-%m-%d %H:%M").replace(tzinfo=ai_tools.HKT)
+    morning = {"hk": {"updated": "2026-11-13 08:37"}}                       # Friday's 08:30 run published
+    assert ai_tools.routine_status(at("2026-11-13 10:36"), morning)["done"]                 # backup run: skip
+    s = ai_tools.routine_status(at("2026-11-13 17:36"), morning)
+    assert s["slot"] == "2026-11-13 17:30" and not s["done"] and not s["late"]              # evening run: due
+    assert not ai_tools.routine_status(at("2026-11-13 17:25"), morning)["done"]             # started a bit early
+    assert ai_tools.routine_status(at("2026-11-13 18:20"), morning)["late"]
+    assert not ai_tools.routine_status(at("2026-11-13 21:00"), morning)["missed"]           # backups still to come
+    assert ai_tools.routine_status(at("2026-11-13 22:20"), morning)["missed"]
+    assert ai_tools.routine_status(at("2026-11-15 12:00"), morning)["slot"] == "2026-11-13 17:30"   # weekend
+    evening = {"hk": {"updated": "2026-11-13 19:38"}}                       # a backup run did it
+    assert ai_tools.routine_status(at("2026-11-15 12:00"), evening)["done"]
+    monday = ai_tools.routine_status(at("2026-11-16 08:36"), evening)
+    assert monday["slot"] == "2026-11-16 08:30" and not monday["done"]
