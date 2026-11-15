@@ -205,8 +205,8 @@ def test_routine_status_spots_a_missed_run():
     assert s["slot"] == "2026-11-13 17:30" and not s["done"] and not s["late"]              # evening run: due
     assert not ai_tools.routine_status(at("2026-11-13 17:25"), morning)["done"]             # started a bit early
     assert ai_tools.routine_status(at("2026-11-13 18:20"), morning)["late"]
-    assert not ai_tools.routine_status(at("2026-11-13 21:00"), morning)["missed"]           # backups still to come
-    assert ai_tools.routine_status(at("2026-11-13 22:20"), morning)["missed"]
+    assert not ai_tools.routine_status(at("2026-11-13 22:20"), morning)["missed"]           # last backup still to come
+    assert ai_tools.routine_status(at("2026-11-13 23:20"), morning)["missed"]
     assert ai_tools.routine_status(at("2026-11-15 12:00"), morning)["slot"] == "2026-11-13 17:30"   # weekend
     evening = {"hk": {"updated": "2026-11-13 19:38"}}                       # a backup run did it
     assert ai_tools.routine_status(at("2026-11-15 12:00"), evening)["done"]

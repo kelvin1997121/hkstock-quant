@@ -48,7 +48,7 @@
 | 數據把關 | `hkstock/quality.py`:指數冇價、股票少咗兩成、指數單日 ±30%、數據日期倒退 → 該市場今次唔更新,保留舊數據 |
 | 失敗通知 | 更新失敗會開 GitHub issue(GitHub email 通知),恢復後自動關閉 |
 | 套件升級 | `.github/dependabot.yml` 每星期六檢查新版本,以 PR 形式出現,`tests.yml` 自動測試,**要人手合併**;`requirements.txt` 有大版本上限 |
-| Claude 分析 | claude.ai 雲端定時任務(用 Claude 訂閱,唔使 API key),寫入 `docs/ai.json` 同 `data/claude_log.json`;需要 Claude GitHub App 有呢個 repo 嘅權限。雲端任務同平時用 Claude 共用用量上限,撞正上限嗰次會做唔到,所以 2 同 4 個鐘後各有一次後備運行(`ai_tools due` 見到已經做過就即刻收工);遲咗網頁會出黃色提示,連後備都失敗就開 issue(GitHub 會出電郵) |
+| Claude 分析 | claude.ai 雲端定時任務(用 Claude 訂閱,唔使 API key),寫入 `docs/ai.json` 同 `data/claude_log.json`;需要 Claude GitHub App 有呢個 repo 嘅權限。雲端任務同平時用 Claude 共用用量上限,撞正上限嗰次會做唔到,所以 2 同 5 個鐘後各有一次後備運行(用量上限 5 個鐘內一定重設,第二次後備實際上避得開同一次上限)(`ai_tools due` 見到已經做過就即刻收工);遲咗網頁會出黃色提示,連後備都失敗就開 issue(GitHub 會出電郵) |
 
 ## 手機提醒(Telegram,可選)
 

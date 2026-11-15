@@ -22,6 +22,10 @@ on:
         description: "Fail on purpose to test the failure notice (issue + email)"
         type: boolean
         default: false
+      test_claude_alarm:
+        description: "Open a test 'Claude analysis missed' issue to check that alarm (the next update closes it)"
+        type: boolean
+        default: false
 
 permissions:
   actions: write   # to restart the ticker if it has stopped
@@ -128,9 +132,18 @@ jobs:
           last=$(echo "$status" | python -c "import json,sys; print(json.load(sys.stdin)['last'])")
           gh label create claude-routine-missed --color fbca04 --description "the scheduled Claude analysis did not run" --force >/dev/null 2>&1 || true
           open=$(gh issue list --label claude-routine-missed --state open --json number --jq '.[0].number // empty')
+          title="Claude 每日分析冇做到($slot)"
+          note=""
+          if [ "${{ inputs.test_claude_alarm }}" = "true" ]; then
+            missed=True
+            title="[測試] Claude 每日分析冇做到通知"
+            note="【呢個係測試】Claude 分析其實正常(最新:$last HKT),只係試吓通知有冇用;下一次更新會自動關閉。真正出事嗰陣,內容會係下面咁:
+
+          "
+          fi
           if [ "$missed" = "True" ]; then
             if [ -z "$open" ]; then
-              gh issue create --title "Claude 每日分析冇做到($slot)" --label claude-routine-missed --body "原定 $slot HKT 嘅 Claude 分析同模擬倉操作冇做到,2 個鐘同 4 個鐘後嘅後備運行都冇成功。上一次成功係 $last HKT。
+              gh issue create --title "$title" --label claude-routine-missed --body "${note}原定 $slot HKT 嘅 Claude 分析同模擬倉操作冇做到,2 個鐘同 5 個鐘後嘅後備運行都冇成功。上一次成功係 $last HKT。
 
           最常見原因:Claude 帳戶去到用量上限(雲端排程同你平時用 Claude 共用同一個限額)。
 

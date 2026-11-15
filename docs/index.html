@@ -414,7 +414,7 @@ function inSession(key){
   if ((DATA[key]?.market?.holidays || []).includes(tzDate(tz))) return false;  // exchange holiday
   return hm >= 930 && hm <= (key === "hk" ? 1615 : 1605);
 }
-// Claude's cloud routine runs on weekdays at 08:30 and 17:30 HKT, with backup runs 2 and 4 hours later.
+// Claude's cloud routine runs on weekdays at 08:30 and 17:30 HKT, with backup runs 2 and 5 hours later.
 // Says so when the latest slot has no analysis (mirrors routine_status in hkstock/ai_tools.py).
 function routineNote(now = Date.now()){
   const last = DATA.ai && ((DATA.ai.hk || {}).updated || DATA.ai.updated);
@@ -432,8 +432,8 @@ function routineNote(now = Date.now()){
   if (slot == null || Date.parse(last.replace(" ", "T") + ":00Z") >= slot - EARLY) return "";
   const waited = (hk - slot) / 60e3, when = new Date(slot).toISOString().slice(5, 16).replace("T", " ");
   if (waited < 45) return "";
-  return waited < 285
-    ? `⚠ Claude 原定 ${when} 嘅分析仲未做到(通常係帳戶用量上限),後備運行會喺 2 同 4 個鐘後再試。下面仲係 ${last} 嘅舊內容。`
+  return waited < 345
+    ? `⚠ Claude 原定 ${when} 嘅分析仲未做到(通常係帳戶用量上限),後備運行會喺 2 同 5 個鐘後再試。下面仲係 ${last} 嘅舊內容。`
     : `⚠ Claude 原定 ${when} 嘅分析冇做到,連後備運行都失敗(通常係帳戶用量上限)。下面仲係 ${last} 嘅舊內容;呢段時間模擬倉冇人睇,只有止蝕同目標價照常生效。`;
 }
 function showRoutineNote(id){ const el = $(id), t = routineNote(); el.hidden = !t; el.textContent = t; }

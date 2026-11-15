@@ -26,11 +26,12 @@ CALLS = ("偏升", "震盪", "偏跌")
 MAX_CHARS = 700  # prompt asks for 600; small allowance for headings
 HKT = timezone(timedelta(hours=8))
 
-# The cloud routine runs on weekdays at 08:30 and 17:30 HKT. Backup runs 2 and 4 hours later do the
+# The cloud routine runs on weekdays at 08:30 and 17:30 HKT. Backup runs 2 and 5 hours later do the
 # work only when the scheduled run never published (on 13 Nov 2026 the 17:30 run was refused because
-# the account had hit its usage limit, and nothing noticed).
+# the account had hit its usage limit, and nothing noticed). The usage window is 5 hours long, so a
+# limit that blocked the scheduled run has always reset by the second backup.
 SLOTS = ((8, 30), (17, 30))
-BACKUP_HOURS = (2, 4)
+BACKUP_HOURS = (2, 5)
 EARLY = timedelta(minutes=30)        # a run may start slightly before its slot
 LATE = timedelta(minutes=45)         # after this the page says the run is late
 
