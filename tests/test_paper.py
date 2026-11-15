@@ -397,3 +397,48 @@ def test_session_waits_when_a_held_stock_has_no_bar():
     assert final["trades"][0]["why"] == "止蝕"                                # next run has the bar: stop taken
     halted, _ = run(e, b, datetime(2026, 11, 6, 0, 0, tzinfo=UTC))           # still no bar two days on: a halt
     assert halted["through"] > "2026-11-03" and "0700.HK" in halted["positions"]
+
+
+def test_target_is_not_taken_on_the_day_of_an_intraday_fill():
+    """Open 104, high 106, low 98: the high may have come before the 99 limit filled."""
+    e = [order(1, "2026-11-02T00:30:00Z", "0700.HK", limit=99.0, stop=90.0, target=105.0)]
+    final, _ = run(e, bars({"0700.HK": {"2026-11-02": (104, 106, 98, 100)}}), datetime(2026, 11, 3, 0, 0, tzinfo=UTC))
+    assert "0700.HK" in final["positions"] and not final["trades"]
+    later, _ = run(e, bars({"0700.HK": {"2026-11-02": (104, 106, 98, 100), "2026-11-03": (100, 106, 99, 104)}}),
+                   datetime(2026, 11, 4, 0, 0, tzinfo=UTC))
+    assert later["trades"][0]["why"] == "到目標" and later["trades"][0]["closed"] == "2026-11-03"
+    at_open = [order(1, "2026-11-02T00:30:00Z", "0700.HK", stop=90.0, target=105.0)]      # market order: filled at the open
+    same, _ = run(at_open, bars({"0700.HK": {"2026-11-02": (100, 106, 99, 104)}}), datetime(2026, 11, 3, 0, 0, tzinfo=UTC))
+    assert same["trades"][0]["why"] == "到目標"
+
+
+def test_reward_against_risk_after_costs(book):
+    eco = paper.economics("hk", 2000, 7.35, 7.15, 7.64)                    # the 中華煤氣 order of 10 Nov
+    assert eco["rr"] == pytest.approx(1.03, abs=0.03) and 0.47 < eco["breakeven"] < 0.51
+    assert 0.004 < eco["cost_pct"] < 0.006                                 # about half a percent for the round trip
+    with pytest.raises(SystemExit, match="唔抵博"):                         # +1% against -2%: needs most trades to win
+        paper.place_order("0700.HK", "buy", 100, stop=392, target=404, reason="目標太近")
+    e = paper.place_order("0700.HK", "buy", 100, stop=392, target=420, reason="目標夠遠")
+    assert e["check"]["rr_net"] > 1 and e["check"]["breakeven"] < 0.5
+    held = paper.economics("us", 2, 1061.0, 1070.0, 1131.0, bought=True)   # stop above cost: nothing to lose
+    assert "rr" not in held
+
+
+def test_cost_stats_and_registered_verdict():
+    e = [order(1, "2026-11-02T00:30:00Z", "0700.HK", stop=95.0)]
+    final, live = run(e, bars({"0700.HK": {"2026-11-03": (97, 98, 93, 94)}}), datetime(2026, 11, 4, 0, 0, tzinfo=UTC))
+    c = paper.cost_stats(live, START, datetime(2026, 11, 4, 10, 0, tzinfo=UTC))
+    assert c["fills"] == 2 and c["hk_days"] == 3 and c["fees_year_est"] is None          # too early for a yearly rate
+    assert c["fee_per_trade_pct"] == pytest.approx(live["fees"] / c["traded_hkd"], abs=1e-5)
+    assert paper.verdict_date(paper.parse_t("2026-11-10T07:02:00Z")) == __import__("datetime").date(2027, 2, 4)
+    now = datetime(2026, 11, 4, 10, 0, tzinfo=UTC)
+    v = paper.account_verdict(final, 0.01, -0.01, now)
+    assert v["result"] is None and v["trades"] == 1 and "verdict" not in final            # not due yet
+    final["trades"] = [{"r": 0.5, "pnl_hkd": 100.0}] * 40                                  # the 40th closed trade
+    v = paper.account_verdict(final, 0.01, -0.01, now)
+    assert v["result"]["result"] == "合格" and v["result"]["why"] == "40 單平倉"
+    assert paper.account_verdict(final, -0.5, 0.5, now)["result"]["result"] == "合格"       # taken once, never redone
+    lost = {**final, "verdict": None, "trades": [{"r": 0.5, "pnl_hkd": 100.0}] * 40}
+    assert paper.account_verdict(lost, 0.01, 0.02, now)["result"]["result"] == "不合格"     # behind the benchmark
+    few = {**final, "verdict": None, "trades": [{"r": 0.5, "pnl_hkd": 1.0}] * 5, "through": "2027-02-04T01:30:00Z"}
+    assert paper.account_verdict(few, 0.01, -0.01, now)["result"]["result"] == "樣本唔夠"

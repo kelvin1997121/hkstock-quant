@@ -237,6 +237,7 @@ button.tbtn{background:var(--chip);color:var(--ink);border:1px solid var(--borde
       <div class="hsum" id="psum"></div>
       <div class="legend"><span><i style="background:var(--s1)"></i>模擬倉資產</span><span><i style="background:var(--s2)"></i>基準:一半恒指、一半標普500(連股息)</span></div>
       <div id="pchart"></div>
+      <div class="note" id="pverdict" hidden></div>
     </div>
     <div class="card">
       <h2>Claude 策略筆記 <span class="badge" id="pplant"></span></h2>
@@ -266,6 +267,12 @@ button.tbtn{background:var(--chip);color:var(--ink);border:1px solid var(--borde
       <div id="plessons" style="margin-top:8px"></div>
       <div id="pdiag" style="margin-top:8px"></div>
       <div class="scroll" style="margin-top:8px"><table id="pgroups"></table></div>
+    </div>
+    <div class="card" id="plancard" hidden>
+      <h2>系統買賣計劃實測 <span class="badge">唔使真係買</span></h2>
+      <div class="sub" id="planrules"></div>
+      <div class="scroll" style="margin-top:8px"><table id="plansum"></table></div>
+      <div id="planrecent" style="margin-top:8px"></div>
     </div>
     <div class="card">
       <h2>規則</h2>
@@ -681,7 +688,12 @@ function renderPaper(){
     <div>基準同期<b class="${cls(p.bench_ret)}">${pct(p.bench_ret, 2)}</b></div>
     <div>現金<b>${num(p.cash, 0)}</b></div><div>已投資<b>${eq ? ((1 - p.cash / eq) * 100).toFixed(0) : 0}%</b></div>
     <div>已平倉<b>${st.trades} 筆${st.win_rate == null ? "" : ` · 勝率 ${(st.win_rate * 100).toFixed(0)}%`}</b></div>
-    <div>累計費用<b>${num(p.fees, 0)}</b></div>`;
+    <div>累計費用<b>${num(p.fees, 0)}</b></div>
+    ${st.fills ? `<div>費用佔起始資金<b>${ap(st.fees_pct, 2)}</b></div><div>買賣次數<b>${st.fills} 次</b></div>
+      <div>平均每次收費<b>${ap(st.fee_per_trade_pct, 2)}</b></div>` : ""}
+    ${st.fees_year_est != null ? `<div>照咁計一年費用<b>${ap(st.fees_year_est)}</b></div>` : ""}`;
+  renderVerdict(p.verdict);
+  renderPlans();
   const h = p.history;
   if (h.length >= 2) lineChart($("pchart"), h.map(x => x[0]), h.map(x => x[1]), h.map(x => x[2]), "模擬倉", "基準", d => d.slice(5));
   else $("pchart").innerHTML = `<div class="sub">有兩日或以上紀錄先畫走勢圖。</div>`;
@@ -734,11 +746,49 @@ function renderPaper(){
 }
 
 // numbers the system worked out itself, shown beside Claude's own wording
-const ap = v => v == null ? "–" : (Math.abs(v) * 100).toFixed(1) + "%";
+const ap = (v, d = 1) => v == null ? "–" : (Math.abs(v) * 100).toFixed(d) + "%";
+// reward against risk once fees are paid: below 1, more than half the trades must win just to break even
+const rrNote = (rr, be) => rr == null ? "" : ` · 扣費後賺蝕比 ${rr}(要 ${(be * 100).toFixed(0)}% 勝率先打和)`;
+
+// the success rule written down in advance (research/PREREG_2026-11-15_paper_verdict.md)
+function renderVerdict(v){
+  const el = $("pverdict"); el.hidden = !v; if (!v) return;
+  const rule = `成績評核(規則 2026-11-15 已經寫低,之後唔會改):第 ${v.sessions} 個港股交易日(${esc(v.date)})收市後,或者第 ${v.max_trades} 單平倉,邊樣先到就邊樣。` +
+    `合格 = 回報高過基準,而且平均每單係賺;做唔到就當「照咁炒唔及買指數基金」;少過 ${v.min_trades} 單平倉當樣本唔夠。`;
+  const r = v.result;
+  el.innerHTML = esc(rule) + (r
+    ? `<div style="margin-top:6px"><b class="${r.result === "合格" ? "pos" : r.result === "不合格" ? "neg" : "wrn"}">結果(${esc(r.taken)},${esc(r.why)}):${esc(r.result)}${r.luck ? "," + esc(r.luck) : ""}</b>` +
+      ` · 回報 ${pct(r.ret, 2)},基準 ${pct(r.bench_ret, 2)} · ${r.trades} 單平倉,平均 R ${r.avg_r ?? "–"}(t ${r.t ?? "–"})</div>`
+    : `<div style="margin-top:6px">而家進度:<b>${v.hk_days} / ${v.sessions}</b> 個交易日 · <b>${v.trades} / ${v.max_trades}</b> 單平倉。未到評核時間,而家嘅賺蝕唔代表乜嘢。</div>`);
+}
+
+// every candidate's buy zone, stop and target followed as a pretend trade (research/PREREG_2026-11-15_plan_trades.md)
+const PLAN_STATUS = {done: "完成", open: "持有中", waiting: "等成交", unfilled: "冇成交", void: "作廢(開市已穿止蝕)", invalid: "計劃無效", split: "拆股,唔計"};
+function renderPlans(){
+  const d = DATA.plans; $("plancard").hidden = !d; if (!d) return;
+  $("planrules").textContent = d.rules;
+  const sg = v => v == null ? "–" : `<span class="${cls(v)}">${pct(v, 2)}</span>`;
+  const row = (name, k) => { const v = k.verdict;
+    const state = v ? `<b class="${v.pass ? "pos" : "neg"}">${v.pass ? "合格" : "不合格"}</b><div class="sub">${esc(v.taken)} 判斷</div>`
+      : `<span class="sub">樣本唔夠</span><div class="sub">${k.signal_days}/${d.min_days} 日 · ${k.done}/${d.min_trades} 單</div>`;
+    return `<tr><td class="l"><b>${name}</b></td><td>${k.days_logged}</td><td>${k.plans}</td><td>${k.done}</td><td>${k.fill_rate == null ? "–" : ap(k.fill_rate, 0)}</td>
+      <td>${k.win_rate == null ? "–" : ap(k.win_rate, 0)}</td><td>${sg(k.day_mean)}<div class="sub">t ${k.t ?? "–"}</div></td>
+      <td>${sg(k.excess_mean)}<div class="sub">t ${k.excess_t ?? "–"}</div></td><td>${sg(k.vs_base_mean)}<div class="sub">t ${k.vs_base_t ?? "–"}</div></td><td>${state}</td></tr>`; };
+  $("plansum").innerHTML = `<tr><th class="l">市場</th><th>記錄日數</th><th>計劃數</th><th>完成交易</th><th>成交率</th><th>勝率</th>
+    <th>每日平均淨回報</th><th>減指數</th><th>減「唔睇位照買」</th><th>判斷</th></tr>` + row("港股", d.markets.hk) + row("美股", d.markets.us);
+  const rec = [...d.markets.hk.recent, ...d.markets.us.recent].sort((a, b) => b.day.localeCompare(a.day)).slice(0, 80);
+  $("planrecent").innerHTML = rec.length ? `<details><summary class="sub">最近嘅計劃同結果(${rec.length})</summary><div class="scroll"><table>
+    <tr><th>訊號日</th><th class="l">股票</th><th>限價 / 止蝕 / 目標</th><th>狀態</th><th>買入</th><th>賣出</th><th>扣費後</th><th>同期指數</th><th>唔睇位照買</th></tr>` +
+    rec.map(r => `<tr><td>${esc(r.day)}</td><td class="l">${esc(r.name)} <span class="sub">${esc(r.t)}</span></td><td>${px(r.eh)} / ${px(r.stop)} / ${px(r.t1)}</td>
+      <td>${esc(PLAN_STATUS[r.status] || r.status)}${r.why ? `<div class="sub">${esc(r.why)}</div>` : ""}</td>
+      <td>${r.entry == null ? "–" : px(r.entry)}<div class="sub">${esc(r.in || "")}</div></td><td>${r.exit == null ? "–" : px(r.exit)}<div class="sub">${esc(r.out || "")}</div></td>
+      <td>${sg(r.net)}</td><td>${sg(r.idx)}</td><td>${sg(r.base)}</td></tr>`).join("") + `</table></div></details>`
+    : `<div class="sub">未有紀錄。每個交易日收市後記低當日候選,下一個交易日開始跟住計。</div>`;
+}
 function checkNote(c){
   if (!c) return "";
   const corr = Object.entries(c.corr || {}).map(([t, v]) => `${esc(t)} ${v}`).join("、");
-  return `<div class="sub">系統計:去到止蝕約蝕 ${num(c.risk_hkd, 0)} 港元(資產 ${ap(c.risk_pct)})· 佔資產 ${ap(c.size_pct)}${corr ? ` · 走勢相近:${corr}` : ""}</div>`;
+  return `<div class="sub">系統計:去到止蝕約蝕 ${num(c.risk_hkd, 0)} 港元(資產 ${ap(c.risk_pct)})· 佔資產 ${ap(c.size_pct)}${rrNote(c.rr_net, c.breakeven)}${corr ? ` · 走勢相近:${corr}` : ""}</div>`;
 }
 function exitNote(c){
   if (!c) return "";
@@ -751,6 +801,7 @@ function posNote(x){
   if (x.ex_div) out.push(`除淨日 ${esc(x.ex_div.date)}${x.ex_div.est ? "(按去年估計)" : ""},每股約 ${x.ex_div.per_share}` +
     (x.ex_div.drop ? `,當日股價約跌 ${ap(x.ex_div.drop)}` : ""));
   if (x.stop != null) { const v = x.stop / x.cost - 1; out.push(`止蝕${v >= 0 ? "高過" : "低過"}成本 ${ap(v)}`); }
+  if (x.rr_net != null) out.push(rrNote(x.rr_net, x.breakeven).replace(" · ", ""));
   return out.length ? `<div class="sub">${out.join(" · ")}</div>` : "";
 }
 
@@ -848,6 +899,7 @@ try { $("hin").value = localStorage.getItem("holdings") || ""; } catch(e){}
 const load = (k, f) => fetch(f + "?t=" + Date.now()).then(r => r.json()).then(d => { DATA[k] = d; if (view === k || view === "hold" || k === "ai") show(view); if (k === view || (view === "hold" && k !== "ai")) liveTick(); })
   .catch(e => { if (view === k) $("upd").textContent = "載入數據失敗:" + e; });
 load("hk", "data.json"); load("us", "us.json"); load("ai", "ai.json"); load("paper", "paper.json");
+fetch("plans.json?t=" + Date.now()).then(r => r.ok ? r.json() : null).then(d => { if (d) { DATA.plans = d; if (view === "paper") renderPlans(); } }).catch(() => {});
 try { $("pv").value = localStorage.getItem("pv") || ""; $("rp").value = localStorage.getItem("rp") || ""; } catch(e){}
 ["pv", "rp"].forEach(id => $(id).oninput = () => { try { localStorage.setItem(id, $(id).value); } catch(e){} if (DATA[view]) render(DATA[view]); });
 show(view);

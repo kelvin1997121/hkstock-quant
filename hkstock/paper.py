@@ -72,6 +72,8 @@ CORR_LIMIT, MAX_GROUP = 0.6, 0.40   # stocks whose 60-day daily returns correlat
 MAX_RISK = 0.015         # shares x (entry - stop) x FX, as a share of equity
 MIN_CASH = 0.10          # cash left after every waiting buy
 MAX_POSITIONS = 8
+MIN_RR = 1.0             # net gain at the target must at least equal the net loss at the stop
+VERDICT_SESSIONS, VERDICT_TRADES, VERDICT_MIN = 60, 40, 10   # research/PREREG_2026-11-15_paper_verdict.md
 LOCK_WORDS = ("鎖定", "鎖住", "保本", "鎖利")   # a stop described like this must be at or above the cost
 MAX_REASON, MAX_PLAN = 200, 700
 SETUPS = ("突破", "回調", "超賣反彈", "趨勢跟隨", "消息/業績", "其他")   # the kind of trade, for the learning stats
@@ -87,6 +89,7 @@ RULES = ("起始資金 10 萬港元;港股美股共用現金(美元按當日匯�
          f"每隻股票落單時最多佔資產 {MAX_POSITION:.0%}(港股每手太大嘅可以買一手,最多 {MAX_ONE_LOT:.0%});買入一定要有止蝕;"
          f"每單去到止蝕最多蝕資產 {MAX_RISK:.1%};同一板塊、或者 60 日走勢相關系數 {CORR_LIMIT} 以上嘅股票加埋最多 {MAX_GROUP:.0%};"
          f"最多 {MAX_POSITIONS} 隻股票;所有買單成交後要留最少 {MIN_CASH:.0%} 現金;"
+         f"有目標價嘅買單,扣埋買賣費用之後,到目標嘅淨賺唔可以少過止蝕嘅淨蝕(賺蝕比最少 {MIN_RR:g});"
          "落單後由下一個開市時段先生效,用真實開市價/最高/最低價成交;限價單同目標價要開市價已經去到,"
          "或者全日最低(沽出就係最高)穿過咗限價先算成交,啱啱掂到唔計;費用按富途收費估算;"
          "除淨日前持有嘅股票會收股息(美股扣 30% 預扣稅,港股全數,H 股實際要扣 10% 未計),股息計入嗰單交易嘅盈虧;"
@@ -110,6 +113,23 @@ def fee(market: str, side: str, shares: int, value: float) -> float:
         if side == "sell":
             f += value * 0.0000278 + min(max(0.01, 0.000166 * shares), 8.30)     # SEC fee, FINRA TAF
     return round(f, 2)
+
+
+def economics(m: str, shares: float, entry: float, stop: float, target=None, bought: bool = False) -> dict:
+    """What a trade loses at its stop and makes at its target after fees and stop slippage, in the
+    stock's own currency. `bought` = entry is a cost that already includes the buying fee."""
+    value = shares * entry
+    buy = 0.0 if bought else fee(m, "buy", shares, value)
+    stop_px = stop * (1 - SLIP[m])
+    loss = (entry - stop_px) * shares + buy + fee(m, "sell", shares, shares * stop_px)
+    out = {"loss": loss, "cost_pct": round((fee(m, "buy", shares, value) + fee(m, "sell", shares, value)) / value, 4)}
+    if target is not None:
+        gain = (target - entry) * shares - buy - fee(m, "sell", shares, shares * target)
+        out["gain"] = gain
+        if loss > 0:                       # with the stop above cost there is no loss to compare with
+            out["rr"] = round(gain / loss, 2)
+            out["breakeven"] = round(loss / (gain + loss), 3) if gain > 0 else 1.0
+    return out
 
 
 def is_trading(m: str, d: date) -> bool:
@@ -449,9 +469,12 @@ def step(st: dict, session: tuple, entries: list[dict], bars: Bars, final: bool,
         if b is None:
             continue
         stop, target = p.get("stop"), p.get("target")
+        # bought today by a limit that filled during the day: the day's high may have come before the
+        # fill, so it cannot count as reaching the target (the stop still counts, the cautious way round)
+        fresh = p["opened"] == d.isoformat() and not p.get("entry_at_open", True)
         if stop is not None and b["l"] <= stop:
             _fill_sell(st, t, p["shares"], min(b["o"], stop) * (1 - SLIP[m]), m, d, fx, "止蝕")
-        elif target is not None and _limit_sell(b, target) is not None:
+        elif target is not None and not fresh and _limit_sell(b, target) is not None:
             _fill_sell(st, t, p["shares"], _limit_sell(b, target), m, d, fx, "到目標")
 
 
@@ -536,6 +559,9 @@ def valuation(st: dict, bars: Bars, today: date) -> tuple[float, list[dict]]:
                      "pnl_pct": round((last * p["shares"] + div) / (p["cost"] * p["shares"]) - 1, 4),
                      "div_hkd": round(div * fx, 2), "stop": p.get("stop"), "target": p.get("target"),
                      "opened": p["opened"], "reason": p.get("reason", "")})
+        if p.get("stop") is not None and p.get("target") is not None:
+            eco = economics(p["market"], p["shares"], p["cost"], p["stop"], p["target"], bought=True)
+            rows[-1]["rr_net"], rows[-1]["breakeven"] = eco.get("rr"), eco.get("breakeven")
     return total, rows
 
 
@@ -606,6 +632,56 @@ def stats(live: dict, history: dict) -> dict:
             "realised": round(gain - loss, 2)}
 
 
+def cost_stats(live: dict, start: datetime, now: datetime) -> dict:
+    """How much trading has cost so far. A yearly rate is only given after 20 sessions."""
+    traded = sum(f["shares"] * f["price"] * (f["fx"] if market_of(f["ticker"]) == "us" else 1.0) for f in live["fills"])
+    days = sum(1 for o, m, d in sessions(start, now) if m == "hk" and finished_at(m, d) <= now)
+    fees, cap = live["fees"], live["capital"]
+    return {"fills": len(live["fills"]), "traded_hkd": round(traded, 0), "fees_pct": round(fees / cap, 5),
+            "fee_per_trade_pct": round(fees / traded, 5) if traded else None, "turnover": round(traded / cap, 2),
+            "hk_days": days, "fees_year_est": round(fees / cap / days * 250, 4) if days >= 20 else None}
+
+
+def verdict_date(start: datetime) -> date:
+    """The 60th Hong Kong session after the start, by the calendar (a typhoon day does not move it)."""
+    d, n = start.astimezone(HKT).date(), 0
+    while True:
+        if is_trading("hk", d) and local_dt("hk", d, 9, 30) > start:
+            n += 1
+            if n == VERDICT_SESSIONS:
+                return d
+        d += timedelta(days=1)
+
+
+def account_verdict(final: dict, ret: float, bench_ret, now: datetime) -> dict:
+    """Progress towards the verdict fixed in research/PREREG_2026-11-15_paper_verdict.md, and the result
+    once it is due. The result is taken once and kept in the state file; do not change the rule here."""
+    start = parse_t(final["start"])
+    due = verdict_date(start)
+    trades = final["trades"]                                   # finished sessions only
+    days = sum(1 for o, m, d in sessions(start, now) if m == "hk" and finished_at(m, d) <= now)
+    out = {"date": due.isoformat(), "sessions": VERDICT_SESSIONS, "max_trades": VERDICT_TRADES,
+           "min_trades": VERDICT_MIN, "hk_days": min(days, VERDICT_SESSIONS), "trades": len(trades),
+           "result": final.get("verdict")}
+    by_date = parse_t(final["through"]) >= local_dt("hk", due, 9, 30)
+    if out["result"] is None and (by_date or len(trades) >= VERDICT_TRADES) and bench_ret is not None:
+        rs = [t["r"] for t in trades if t.get("r") is not None]
+        avg_r = sum(rs) / len(rs) if rs else None
+        s = learn.overall(trades)
+        if len(trades) < VERDICT_MIN:
+            res = "樣本唔夠"
+        elif ret > bench_ret and avg_r is not None and avg_r > 0:
+            res = "合格"
+        else:
+            res = "不合格"
+        luck = None if res != "合格" else ("唔似係好彩" if (s["t"] or 0) >= 2.0 else "未能排除好彩")
+        final["verdict"] = out["result"] = {
+            "taken": hkt_str(now), "why": f"{VERDICT_TRADES} 單平倉" if len(trades) >= VERDICT_TRADES else f"{VERDICT_SESSIONS} 個交易日",
+            "result": res, "luck": luck, "ret": ret, "bench_ret": bench_ret, "trades": len(trades),
+            "avg_r": None if avg_r is None else round(avg_r, 3), "t": s["t"], "win_rate": s["win_rate"]}
+    return out
+
+
 def build_view(final: dict, live: dict, entries: list[dict], bars: Bars, now: datetime,
                outlook: dict | None = None) -> tuple[dict, dict]:
     today = now.astimezone(HKT).date()
@@ -648,7 +724,10 @@ def build_view(final: dict, live: dict, entries: list[dict], bars: Bars, now: da
                       "diagnostics": learn.diagnostics(scored), "min_n": learn.MIN_N, "min_adopt": MIN_ADOPT},
             "lessons": learn.fold_lessons(entries),
             "history": [[k, v["equity"], v["bench"]] for k, v in sorted(history.items())],
-            "plans": plans, "stats": stats(live, history), "rules": RULES,
+            "plans": plans, "stats": {**stats(live, history), **cost_stats(live, parse_t(final["start"]), now)},
+            "verdict": account_verdict(final, round(equity / final["capital"] - 1, 4),
+                                       round(bench / final["capital"] - 1, 4) if bench else None, now),
+            "rules": RULES,
             "dividends": [{**x, "name": nm.get(x["ticker"], x["ticker"])} for x in live.get("dividends", [])][-30:][::-1]}
     return final, view
 
@@ -852,6 +931,13 @@ def place_order(ticker: str, side: str, shares: int, limit=None, stop=None, targ
                              + f",加埋會超過資產 {MAX_GROUP:.0%}")
         check = {"risk_hkd": round(risk, 0), "risk_pct": round(risk / eq, 4), "size_pct": round(cost / eq, 4),
                  "corr": {t: round(c, 2) for t, c in corr.items()}}
+        eco = economics(m, shares, ref, stop, target)
+        check["cost_pct"] = eco["cost_pct"]
+        if target is not None:
+            check["rr_net"], check["breakeven"] = eco["rr"], eco["breakeven"]
+            if eco["rr"] < MIN_RR:
+                raise SystemExit(f"扣埋費用唔抵博:到目標淨賺約 {eco['gain'] * fx:,.0f} 港元,止蝕淨蝕約 {eco['loss'] * fx:,.0f} 港元,"
+                                 f"賺蝕比 {eco['rr']} 低過 {MIN_RR:g}(要勝率過半先打和)。改目標、收窄止蝕,或者唔買")
     else:
         have = pos.get(ticker, {}).get("shares", 0) - pend_sell.get(ticker, 0)
         if shares > have:
@@ -968,6 +1054,37 @@ def add_lesson(text: str | None, evidence: list[int], status: str | None, lesson
     return _append({"type": "lesson", "text": text, "status": "試行", "evidence": evidence, "note": note})
 
 
+def _brief_extras(v: dict) -> list[str]:
+    """Costs so far, the registered verdict, and how the system's own trade plans have done."""
+    pc = lambda x, n=2: "–" if x is None else f"{x * 100:.{n}f}%"
+    s, out = v["stats"], []
+    if s.get("fills"):
+        out.append(f"費用:累計 {v['fees']:,.0f} 港元 = 起始資金嘅 {pc(s['fees_pct'])};買賣 {s['fills']} 次共 {s['traded_hkd']:,.0f} 港元,"
+                   f"平均每次收費 {pc(s['fee_per_trade_pct'])}"
+                   + (f";照呢個速度一年費用約 {pc(s['fees_year_est'], 1)}" if s.get("fees_year_est") is not None else "")
+                   + "。港股細額交易一買一賣連滑價約 0.5% 至 0.7%,美股約 0.2%:買賣越密,要賺返嘅費用越多。")
+    vd = v.get("verdict")
+    if vd:
+        line = (f"成績評核(規則已經預先寫低,唔會改):第 {vd['sessions']} 個港股交易日({vd['date']})收市後,或者第 {vd['max_trades']} 單平倉,"
+                f"邊樣先到就邊樣;回報要高過基準,而且平均每單 R 大過 0 先算合格,少過 {vd['min_trades']} 單當樣本唔夠。"
+                f"而家 {vd['hk_days']}/{vd['sessions']} 日、{vd['trades']}/{vd['max_trades']} 單。")
+        if vd.get("result"):
+            r = vd["result"]
+            line += f" 已有結果({r['taken']}):{r['result']}{'(' + r['luck'] + ')' if r.get('luck') else ''}。"
+        out.append(line)
+    pl = read_json(DOCS / "plans.json", None)
+    if pl:
+        out.append("系統買賣計劃實測(每日候選照買入區、止蝕、目標去做嘅假交易,扣埋費用;樣本夠之前只供參考,唔好當結論):")
+        for m, name in (("hk", "港股"), ("us", "美股")):
+            k = pl["markets"].get(m) or {}
+            verdict = k.get("verdict")
+            out.append(f"- {name}:{k.get('signal_days', 0)}/{pl['min_days']} 個訊號日,完成 {k.get('done', 0)}/{pl['min_trades']} 單,"
+                       f"成交率 {pc(k.get('fill_rate'), 0)},勝率 {pc(k.get('win_rate'), 0)},每日平均淨回報 {pc(k.get('day_mean'))}"
+                       f"(t={k.get('t')}),對指數 {pc(k.get('excess_mean'))}(t={k.get('excess_t')}),對「唔睇位照買」 {pc(k.get('vs_base_mean'))}"
+                       + (f" → 已判斷:{'合格' if verdict['pass'] else '不合格'}" if verdict else " → 樣本唔夠"))
+    return out
+
+
 def brief() -> str:
     v = read_json(VIEW, None)
     if v is None:
@@ -980,6 +1097,7 @@ def brief() -> str:
              f"現金 {v['cash']:,.0f};已投資 {v['invested'] * 100:.0f}%;累計費用 {v['fees']:,.0f};USD/HKD {v['fx']}",
              f"規則:{v['rules']}",
              f"統計:{json.dumps(v['stats'], ensure_ascii=False)}",
+             *_brief_extras(v),
              "落單前兩個市場嘅數據都要讀:python3 -m hkstock.ai_tools brief --market hk 同 --market us"
              "(傍晚嗰次都要讀美股,因為美股單今晚就生效)。", "", "## 持倉"]
     for p in v["positions"] or []:
@@ -993,6 +1111,7 @@ def brief() -> str:
                      f"盈虧{p['pnl_hkd']:+,.0f}港元 {pc(p['pnl_pct'])} 止蝕{p['stop']}{vs} 目標{p['target']} 開倉{p['opened']} "
                      f"| 系統短炒計劃{json.dumps(s.get('plan', {}).get('short'), ensure_ascii=False)} RSI{s.get('rsi', 0):.0f} "
                      f"業績{s.get('earnings') or '–'}{'(估)' if s.get('earnings_est') else ''}"
+                     + (f" 扣費後賺蝕比{p['rr_net']}(要{p['breakeven'] * 100:.0f}%勝率先打和)" if p.get("rr_net") is not None else "")
                      + (f" 已收股息{p['div_hkd']:,.0f}港元" if p.get("div_hkd") else "")
                      + (f" | 除淨{p['ex_div']['date']}{'(按去年估計)' if p['ex_div']['est'] else ''} 每股約{p['ex_div']['per_share']}"
                         f",除淨日股價約跌{(p['ex_div']['drop'] or 0) * 100:.1f}%,會收返股息但跌幅可能觸發止蝕" if p.get("ex_div") else "")
@@ -1005,7 +1124,9 @@ def brief() -> str:
                      f"{'限價' + str(o['limit']) if o['limit'] else '市價'} 止蝕{o['stop']} 目標{o['target']} "
                      f"→ {o['status']} {o['note']}"
                      + (f" | 系統計:止蝕風險{o['check']['risk_hkd']:,.0f}港元({pc(o['check']['risk_pct'])}資產)"
-                        f" 佔資產{pc(o['check']['size_pct'])}" if o.get("check") else ""))
+                        f" 佔資產{pc(o['check']['size_pct'])}" if o.get("check") else "")
+                     + (f" 扣費後賺蝕比{o['check']['rr_net']}(要{o['check']['breakeven'] * 100:.0f}%勝率先打和)"
+                        if (o.get("check") or {}).get("rr_net") is not None else ""))
     for c in v.get("controls", [])[:8]:
         k = c.get("check") or {}
         what = f"取消 #{c['order']}" if c["type"] == "cancel" else f"{c['ticker']} 改止蝕{c['stop']} 目標{c['target']}"

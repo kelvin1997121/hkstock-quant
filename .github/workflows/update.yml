@@ -83,6 +83,12 @@ jobs:
           PYTHONIOENCODING: utf-8
         run: python -m hkstock.paper update || { echo "::warning::simulated account update failed"; exit 1; }
 
+      - name: Trade-plan record (write down today's plans, follow earlier ones; nothing is bought)
+        continue-on-error: true
+        env:
+          PYTHONIOENCODING: utf-8
+        run: python -m hkstock.plans update || { echo "::warning::trade-plan record failed"; exit 1; }
+
       - name: Restore alert state
         uses: actions/cache/restore@v6
         with:
