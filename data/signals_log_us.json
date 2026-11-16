@@ -138,5 +138,33 @@
    "XOM",
    "COP"
   ]
+ },
+ "2026-11-16": {
+  "regime_score": -39,
+  "label": "偏淡",
+  "short": [
+   "NVO",
+   "COST",
+   "HD",
+   "MO",
+   "BRK-B",
+   "JNJ",
+   "LLY",
+   "WMT",
+   "JD",
+   "BTI"
+  ],
+  "long": [
+   "MO",
+   "ABBV",
+   "CVX",
+   "AAPL",
+   "MRK",
+   "V",
+   "PFE",
+   "COP",
+   "XOM",
+   "JNJ"
+  ]
  }
 }
