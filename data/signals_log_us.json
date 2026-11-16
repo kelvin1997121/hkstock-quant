@@ -143,16 +143,16 @@
   "regime_score": -39,
   "label": "偏淡",
   "short": [
-   "NVO",
    "COST",
+   "NVO",
    "HD",
    "MO",
-   "BRK-B",
-   "JNJ",
-   "LLY",
    "WMT",
+   "TME",
+   "JNJ",
    "JD",
-   "BTI"
+   "LLY",
+   "BRK-B"
   ],
   "long": [
    "MO",
