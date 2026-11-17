@@ -166,5 +166,33 @@
    "XOM",
    "JNJ"
   ]
+ },
+ "2026-11-17": {
+  "regime_score": -57,
+  "label": "弱勢",
+  "short": [
+   "TME",
+   "HD",
+   "NVO",
+   "WMT",
+   "COST",
+   "BRK-B",
+   "JNJ",
+   "LLY",
+   "NOC",
+   "NEE"
+  ],
+  "long": [
+   "ABBV",
+   "CVX",
+   "MO",
+   "MRK",
+   "V",
+   "AAPL",
+   "COP",
+   "JNJ",
+   "XOM",
+   "PFE"
+  ]
  }
 }
