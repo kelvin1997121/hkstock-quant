@@ -584,7 +584,7 @@
 "earnings": "2027-02-11",
 "earnings_est": false,
 "ex_div": "2026-11-19",
-"fetched": "2026-11-13",
+"fetched": "2026-11-17",
 "v": 2
 },
 "AMD": {
@@ -651,10 +651,10 @@
 "v": 2
 },
 "BIDU": {
-"earnings": "2026-11-16",
+"earnings": "2027-02-25",
 "earnings_est": false,
 "ex_div": null,
-"fetched": "2026-11-16",
+"fetched": "2026-11-17",
 "v": 2
 },
 "BRK-B": {
@@ -737,8 +737,8 @@
 "CSCO": {
 "earnings": "2027-02-10",
 "earnings_est": false,
-"ex_div": "2026-10-02",
-"fetched": "2026-11-13",
+"ex_div": "2027-01-04",
+"fetched": "2026-11-17",
 "v": 2
 },
 "CVX": {
