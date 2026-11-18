@@ -194,5 +194,33 @@
    "XOM",
    "PFE"
   ]
+ },
+ "2026-11-18": {
+  "regime_score": -59,
+  "label": "弱勢",
+  "short": [
+   "WMT",
+   "TME",
+   "COST",
+   "SBUX",
+   "NEE",
+   "RTX",
+   "HD",
+   "MCD",
+   "AMZN",
+   "AVGO"
+  ],
+  "long": [
+   "MO",
+   "AAPL",
+   "ABBV",
+   "MRK",
+   "V",
+   "JNJ",
+   "PFE",
+   "COP",
+   "CVX",
+   "XOM"
+  ]
  }
 }
