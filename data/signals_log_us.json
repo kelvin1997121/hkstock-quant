@@ -222,5 +222,33 @@
    "CVX",
    "XOM"
   ]
+ },
+ "2026-11-19": {
+  "regime_score": -65,
+  "label": "弱勢",
+  "short": [
+   "PDD",
+   "WMT",
+   "COST",
+   "TME",
+   "BRK-B",
+   "MCD",
+   "PANW",
+   "HD",
+   "CRWD",
+   "AVGO"
+  ],
+  "long": [
+   "MO",
+   "CVX",
+   "AAPL",
+   "PFE",
+   "ABBV",
+   "COP",
+   "JNJ",
+   "XOM",
+   "MRK",
+   "V"
+  ]
  }
 }
