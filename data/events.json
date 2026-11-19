@@ -119,10 +119,10 @@
 "v": 2
 },
 "0700.HK": {
-"earnings": "2026-11-18",
-"earnings_est": false,
+"earnings": "2027-03-17",
+"earnings_est": true,
 "ex_div": "2026-05-15",
-"fetched": "2026-11-16",
+"fetched": "2026-11-19",
 "v": 2
 },
 "0728.HK": {
@@ -217,10 +217,10 @@
 "v": 2
 },
 "1093.HK": {
-"earnings": "2026-11-18",
-"earnings_est": false,
+"earnings": "2027-03-24",
+"earnings_est": true,
 "ex_div": "2026-10-20",
-"fetched": "2026-11-16",
+"fetched": "2026-11-19",
 "v": 2
 },
 "1109.HK": {
