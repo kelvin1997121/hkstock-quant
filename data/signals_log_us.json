@@ -224,15 +224,15 @@
   ]
  },
  "2026-11-19": {
-  "regime_score": -65,
+  "regime_score": -66,
   "label": "弱勢",
   "short": [
    "PDD",
    "WMT",
    "COST",
    "TME",
-   "BRK-B",
    "MCD",
+   "BRK-B",
    "PANW",
    "HD",
    "CRWD",
