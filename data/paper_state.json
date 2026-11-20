@@ -1,8 +1,8 @@
 {
  "start": "2026-11-10T07:02:10Z",
  "capital": 100000.0,
- "through": "2026-11-19T14:30:00Z",
- "cash": 52380.91534488677,
+ "through": "2026-11-20T01:30:00Z",
+ "cash": 67088.47534488677,
  "positions": {
   "COST": {
    "shares": 2,
@@ -31,34 +31,6 @@
    "risk": 37.804999999999836,
    "stop": 1075.0,
    "target": 1131.28
-  },
-  "0003.HK": {
-   "shares": 2000,
-   "cost": 7.36883,
-   "market": "hk",
-   "opened": "2026-11-11",
-   "reason": "中華煤氣創20日新高,資金流入,低波幅;限價買區內,止蝕7.15,風險細",
-   "order": 1,
-   "setup": "突破",
-   "ctx": {
-    "market": "hk",
-    "regime": "偏好",
-    "regime_score": 22,
-    "theme": "電訊公用高息",
-    "theme_verdict": "觀望",
-    "short_score": 85.0,
-    "long_score": 82.0,
-    "rsi": 65.0,
-    "ret5": 0.015,
-    "ret20": 0.0428,
-    "above_ma50": true,
-    "above_ma200": true,
-    "earn_days": -84,
-    "stop_pct": -0.0272
-   },
-   "risk": 0.21882999999999964,
-   "stop": 7.38,
-   "target": 7.64
   },
   "1398.HK": {
    "shares": 2000,
@@ -117,6 +89,11 @@
   },
   "11": {
    "status": "filled",
+   "seen": 0,
+   "note": ""
+  },
+  "33": {
+   "status": "pending",
    "seen": 0,
    "note": ""
   }
@@ -191,6 +168,16 @@
    "fee_hkd": 33.41,
    "fx": 7.8448,
    "why": "止蝕"
+  },
+  {
+   "date": "2026-11-20",
+   "ticker": "0003.HK",
+   "side": "sell",
+   "shares": 2000,
+   "price": 7.3726,
+   "fee_hkd": 37.68,
+   "fx": 7.837,
+   "why": "止蝕"
   }
  ],
  "trades": [
@@ -263,9 +250,44 @@
    },
    "order": 11,
    "r": -1.09
+  },
+  {
+   "ticker": "0003.HK",
+   "market": "hk",
+   "opened": "2026-11-11",
+   "closed": "2026-11-20",
+   "shares": 2000,
+   "entry": 7.3688,
+   "exit": 7.3726,
+   "pnl_hkd": -30.1,
+   "pnl_pct": -0.002,
+   "why": "止蝕",
+   "reason": "中華煤氣創20日新高,資金流入,低波幅;限價買區內,止蝕7.15,風險細",
+   "id": 3,
+   "div_hkd": 0.0,
+   "entry_at_open": false,
+   "setup": "突破",
+   "ctx": {
+    "market": "hk",
+    "regime": "偏好",
+    "regime_score": 22,
+    "theme": "電訊公用高息",
+    "theme_verdict": "觀望",
+    "short_score": 85.0,
+    "long_score": 82.0,
+    "rsi": 65.0,
+    "ret5": 0.015,
+    "ret20": 0.0428,
+    "above_ma50": true,
+    "above_ma200": true,
+    "earn_days": -84,
+    "stop_pct": -0.0272
+   },
+   "order": 1,
+   "r": -0.07
   }
  ],
- "fees": 262.21095272064207,
+ "fees": 299.8909527206421,
  "history": {
   "2026-11-10": {
    "equity": 100049.19,
@@ -308,7 +330,7 @@
    "bench": 95399.32
   },
   "2026-11-20": {
-   "equity": 100011.13,
+   "equity": 100003.17,
    "bench": 93765.67
   }
  },
