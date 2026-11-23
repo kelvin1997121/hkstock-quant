@@ -120,9 +120,9 @@
 },
 "0700.HK": {
 "earnings": "2027-03-17",
-"earnings_est": true,
+"earnings_est": false,
 "ex_div": "2026-05-15",
-"fetched": "2026-11-19",
+"fetched": "2026-11-23",
 "v": 2
 },
 "0728.HK": {
@@ -150,7 +150,7 @@
 "earnings": "2027-05-27",
 "earnings_est": false,
 "ex_div": "2026-11-24",
-"fetched": "2026-11-17",
+"fetched": "2026-11-23",
 "v": 2
 },
 "0857.HK": {
@@ -192,7 +192,7 @@
 "earnings": "2027-02-11",
 "earnings_est": false,
 "ex_div": null,
-"fetched": "2026-11-17",
+"fetched": "2026-11-23",
 "v": 2
 },
 "0992.HK": {
@@ -217,10 +217,10 @@
 "v": 2
 },
 "1093.HK": {
-"earnings": "2027-03-24",
-"earnings_est": true,
+"earnings": "2027-03-25",
+"earnings_est": false,
 "ex_div": "2026-10-20",
-"fetched": "2026-11-19",
+"fetched": "2026-11-23",
 "v": 2
 },
 "1109.HK": {
@@ -406,10 +406,10 @@
 "v": 2
 },
 "2618.HK": {
-"earnings": null,
+"earnings": "2027-03-04",
 "earnings_est": false,
 "ex_div": null,
-"fetched": "2026-11-18",
+"fetched": "2026-11-23",
 "v": 2
 },
 "2628.HK": {
@@ -484,9 +484,9 @@
 },
 "9618.HK": {
 "earnings": "2027-03-04",
-"earnings_est": true,
+"earnings_est": false,
 "ex_div": "2026-04-08",
-"fetched": "2026-11-18",
+"fetched": "2026-11-23",
 "v": 2
 },
 "9633.HK": {
@@ -504,10 +504,10 @@
 "v": 2
 },
 "9868.HK": {
-"earnings": "2027-03-19",
-"earnings_est": true,
+"earnings": "2027-03-18",
+"earnings_est": false,
 "ex_div": null,
-"fetched": "2026-11-17",
+"fetched": "2026-11-23",
 "v": 2
 },
 "9880.HK": {
@@ -521,7 +521,7 @@
 "earnings": "2027-02-25",
 "earnings_est": false,
 "ex_div": null,
-"fetched": "2026-11-18",
+"fetched": "2026-11-23",
 "v": 2
 },
 "9926.HK": {
