@@ -280,19 +280,19 @@
   ]
  },
  "2026-11-23": {
-  "regime_score": -74,
+  "regime_score": -73,
   "label": "弱勢",
   "short": [
    "PDD",
    "WMT",
+   "HD",
    "COST",
    "SBUX",
-   "HD",
    "MCD",
    "BRK-B",
    "AAPL",
    "TSLA",
-   "AVGO"
+   "ABBV"
   ],
   "long": [
    "CVX",
