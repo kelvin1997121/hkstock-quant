@@ -584,7 +584,7 @@
 "earnings": "2027-02-11",
 "earnings_est": false,
 "ex_div": "2026-11-19",
-"fetched": "2026-11-17",
+"fetched": "2026-11-23",
 "v": 2
 },
 "AMD": {
@@ -654,7 +654,7 @@
 "earnings": "2027-02-25",
 "earnings_est": false,
 "ex_div": null,
-"fetched": "2026-11-17",
+"fetched": "2026-11-23",
 "v": 2
 },
 "BRK-B": {
@@ -738,7 +738,7 @@
 "earnings": "2027-02-10",
 "earnings_est": false,
 "ex_div": "2027-01-04",
-"fetched": "2026-11-17",
+"fetched": "2026-11-23",
 "v": 2
 },
 "CVX": {
@@ -772,8 +772,8 @@
 "HD": {
 "earnings": "2027-02-23",
 "earnings_est": false,
-"ex_div": "2026-09-03",
-"fetched": "2026-11-18",
+"ex_div": "2026-12-03",
+"fetched": "2026-11-23",
 "v": 2
 },
 "HOOD": {
@@ -801,7 +801,7 @@
 "earnings": "2027-03-04",
 "earnings_est": false,
 "ex_div": "2026-04-09",
-"fetched": "2026-11-18",
+"fetched": "2026-11-23",
 "v": 2
 },
 "JNJ": {
@@ -975,8 +975,8 @@
 "NVDA": {
 "earnings": "2027-02-24",
 "earnings_est": false,
-"ex_div": "2026-09-10",
-"fetched": "2026-11-18",
+"ex_div": "2026-12-02",
+"fetched": "2026-11-23",
 "v": 2
 },
 "NVO": {
@@ -1011,7 +1011,7 @@
 "earnings": "2027-02-16",
 "earnings_est": false,
 "ex_div": null,
-"fetched": "2026-11-19",
+"fetched": "2026-11-23",
 "v": 2
 },
 "PDD": {
@@ -1130,7 +1130,7 @@
 "earnings": "2027-03-16",
 "earnings_est": false,
 "ex_div": "2026-04-02",
-"fetched": "2026-11-18",
+"fetched": "2026-11-23",
 "v": 2
 },
 "TSLA": {
