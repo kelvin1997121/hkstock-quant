@@ -306,5 +306,33 @@
    "V",
    "MRK"
   ]
+ },
+ "2026-11-24": {
+  "regime_score": -65,
+  "label": "弱勢",
+  "short": [
+   "PDD",
+   "WMT",
+   "ABBV",
+   "COST",
+   "HD",
+   "SBUX",
+   "JNJ",
+   "AAPL",
+   "BRK-B",
+   "MCD"
+  ],
+  "long": [
+   "CVX",
+   "ABBV",
+   "MO",
+   "AAPL",
+   "COP",
+   "XOM",
+   "JNJ",
+   "PFE",
+   "MRK",
+   "V"
+  ]
  }
 }
