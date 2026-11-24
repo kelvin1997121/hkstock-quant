@@ -405,21 +405,13 @@
    "bench": 94310.4
   },
   "2026-11-24": {
-   "equity": 99661.91,
-   "bench": 93781.46
+   "equity": 99433.39,
+   "bench": 93193.55
   }
  },
  "outlook": {
   "date": "2026-11-24",
-  "tickers": [
-   "COST"
-  ],
-  "data": {
-   "COST": {
-    "date": "2026-11-24",
-    "est": false,
-    "per_share": 1.47
-   }
-  }
+  "tickers": [],
+  "data": {}
  }
 }
