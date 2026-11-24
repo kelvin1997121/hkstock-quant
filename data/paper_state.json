@@ -388,22 +388,16 @@
    "bench": 94310.4
   },
   "2026-11-24": {
-   "equity": 99888.84,
-   "bench": 94173.89
+   "equity": 99694.77,
+   "bench": 94497.43
   }
  },
  "outlook": {
   "date": "2026-11-24",
   "tickers": [
-   "1398.HK",
    "COST"
   ],
   "data": {
-   "1398.HK": {
-    "date": "2026-12-03",
-    "est": true,
-    "per_share": 0.15575
-   },
    "COST": {
     "date": "2026-11-24",
     "est": false,
