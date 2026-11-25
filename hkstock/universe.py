@@ -200,5 +200,3 @@ US = Market(
 )
 
 MARKETS = {"hk": HK, "us": US}
-
-# safety-net test 2026-11-26: this line must be reverted automatically
