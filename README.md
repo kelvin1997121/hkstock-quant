@@ -45,7 +45,8 @@
 |---|---|
 | 分析更新 | `.github/workflows/ticker.yml` 喺交易時段(港股 08:30–16:45 HKT、美股 08:30–16:50 紐約時間)每 15 分鐘觸發 `update.yml`;GitHub 自己嘅定時只係後備 |
 | 假期 | `hkstock/market_days.py` 收錄 2026–2028 港美股假期同半日市,假期唔分析、唔記錄;之後嘅年份自動用 `exchange_calendars` 計 |
-| 自我檢查 | 每次更新先跑 `tests/`(86 個測試),唔過就唔發佈 |
+| 自動維護 | 每個星期六 Claude 雲端排程(`hkstock 每週自動維護`)讀健康檢查(`python -m hkstock.maintenance check`),修 bug、更新套件、加測試,直接推上 main。唔可以改交易規則、評分、股票名單、評核規則同現有測試(`hkstock/maintenance.py` 嘅 guard 會擋,`.github/workflows/maintenance.yml` 會再檢查一次同跑測試,唔合格就自動撤回同開 issue);呢類改動只會寫成建議。有改動或者要你決定嘅時候開 issue(GitHub 會出電郵),紀錄喺網頁底部 |
+| 自我檢查 | 每次更新先跑 `tests/`(96 個測試),唔過就唔發佈 |
 | 數據把關 | `hkstock/quality.py`:指數冇價、股票少咗兩成、指數單日 ±30%、數據日期倒退 → 該市場今次唔更新,保留舊數據 |
 | 失敗通知 | 更新失敗會開 GitHub issue(GitHub email 通知),恢復後自動關閉 |
 | 套件升級 | `.github/dependabot.yml` 每星期六檢查新版本,以 PR 形式出現,`tests.yml` 自動測試,**要人手合併**;`requirements.txt` 有大版本上限 |

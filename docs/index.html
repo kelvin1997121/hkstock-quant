@@ -280,6 +280,13 @@ button.tbtn{background:var(--chip);color:var(--ink);border:1px solid var(--borde
     </div>
   </div>
 
+  <details class="card" id="maintcard" hidden>
+    <summary><b>系統自動維護</b> <span class="sub" id="maintsum"></span></summary>
+    <div class="sub" style="margin-top:6px">每個星期六 Claude 自動檢查同維護系統:修 bug、更新套件、加測試。
+      佢唔可以改交易規則、評分、股票名單同評核規則(呢啲寫成建議,由你決定);每個改動 GitHub 會再檢查一次同跑晒測試,唔合格就自動撤回。</div>
+    <div id="maintlist" style="margin-top:8px"></div>
+  </details>
+
   <footer>數據:Yahoo Finance(港股延遲約15分鐘)、東方財富(南向資金)、RTHK / 經濟通 / Google News。
   本頁只係數據分析工具,唔係投資建議;過往表現唔代表將來,投資有風險,自己決定自己負責。</footer>
 </div>
@@ -750,6 +757,17 @@ const ap = (v, d = 1) => v == null ? "–" : (Math.abs(v) * 100).toFixed(d) + "%
 // reward against risk once fees are paid: below 1, more than half the trades must win just to break even
 const rrNote = (rr, be) => rr == null ? "" : ` · 扣費後賺蝕比 ${rr}(要 ${(be * 100).toFixed(0)}% 勝率先打和)`;
 
+// weekly automatic maintenance log (hkstock/maintenance.py, written by the Saturday routine)
+function renderMaint(m){
+  if (!m || !m.entries || !m.entries.length) return;
+  const S = {ok: ["一切正常", "pos"], changed: ["有改動", "wrn"], attention: ["要你睇", "neg"]};
+  const e = m.entries[0], [label, c] = S[e.status] || [e.status, ""];
+  $("maintcard").hidden = false;
+  $("maintsum").innerHTML = `· 最近 ${esc(e.at)} · <span class="${c}">${label}</span> · 改動 ${e.changes} 項 · 建議 ${e.proposals} 項`;
+  $("maintlist").innerHTML = m.entries.map(x => { const [l, k] = S[x.status] || [x.status, ""];
+    return `<div style="margin-top:8px"><b>${esc(x.at)}</b> <span class="${k}">${l}</span><div class="analysis">${esc(x.text)}</div></div>`; }).join("");
+}
+
 // the success rule written down in advance (research/PREREG_2026-11-15_paper_verdict.md)
 function renderVerdict(v){
   const el = $("pverdict"); el.hidden = !v; if (!v) return;
@@ -899,6 +917,7 @@ try { $("hin").value = localStorage.getItem("holdings") || ""; } catch(e){}
 const load = (k, f) => fetch(f + "?t=" + Date.now()).then(r => r.json()).then(d => { DATA[k] = d; if (view === k || view === "hold" || k === "ai") show(view); if (k === view || (view === "hold" && k !== "ai")) liveTick(); })
   .catch(e => { if (view === k) $("upd").textContent = "載入數據失敗:" + e; });
 load("hk", "data.json"); load("us", "us.json"); load("ai", "ai.json"); load("paper", "paper.json");
+fetch("maintenance.json?t=" + Date.now()).then(r => r.ok ? r.json() : null).then(renderMaint).catch(() => {});
 fetch("plans.json?t=" + Date.now()).then(r => r.ok ? r.json() : null).then(d => { if (d) { DATA.plans = d; if (view === "paper") renderPlans(); } }).catch(() => {});
 try { $("pv").value = localStorage.getItem("pv") || ""; $("rp").value = localStorage.getItem("rp") || ""; } catch(e){}
 ["pv", "rp"].forEach(id => $(id).oninput = () => { try { localStorage.setItem(id, $(id).value); } catch(e){} if (DATA[view]) render(DATA[view]); });

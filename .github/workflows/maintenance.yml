@@ -1,0 +1,107 @@
+name: maintenance
+
+# Re-checks every commit the weekly maintenance routine pushes (subject starting "maint:"): the change
+# guard in hkstock/maintenance.py and the full tests run again here. If either fails, those commits are
+# reverted and an issue is opened (GitHub emails the owner). Otherwise, when the push carries the week's
+# report and it says something changed or needs the owner, the report is posted as an issue.
+# Pushes made by this repo's own workflows (data updates, reverts) do not start this workflow.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      base:
+        description: "Check the maint: commits since this commit (default: the previous commit)"
+        default: ""
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: maintenance
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    if: github.event_name == 'workflow_dispatch' || contains(join(github.event.commits.*.message, ' '), 'maint:')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      PYTHONIOENCODING: utf-8
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - run: pip install -r requirements.txt "pytest>=8"
+
+      - name: Guard and tests
+        id: verify
+        run: |
+          base="${{ github.event.before }}"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            base="${{ inputs.base }}"; [ -n "$base" ] || base=$(git rev-parse HEAD~1)
+          fi
+          head="${{ github.sha }}"
+          echo "base=$base" >> "$GITHUB_OUTPUT"
+          if [ -z "$(git rev-list "$base..$head" --grep '^maint:')" ]; then
+            echo "no maint: commit in this push"; echo "skip=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          set +e
+          python -m hkstock.maintenance guard --base "$base" --head "$head" > guard.txt 2>&1; g=$?
+          python -m pytest -q > tests.txt 2>&1; t=$?
+          cat guard.txt; tail -5 tests.txt
+          echo "guard=$g" >> "$GITHUB_OUTPUT"; echo "tests=$t" >> "$GITHUB_OUTPUT"
+
+      - name: Revert rejected maintenance commits
+        if: steps.verify.outputs.skip != 'true' && (steps.verify.outputs.guard != '0' || steps.verify.outputs.tests != '0')
+        run: |
+          git config user.name "hkstock-bot"
+          git config user.email "hkstock-bot@users.noreply.github.com"
+          base="${{ steps.verify.outputs.base }}"
+          for c in $(git rev-list "$base..${{ github.sha }}" --grep '^maint:'); do
+            git revert --no-edit "$c" || { git revert --abort; echo "::error::could not revert $c"; exit 1; }
+          done
+          pushed=0
+          for i in 1 2 3; do git pull --rebase -q && git push && { pushed=1; break; }; sleep 5; done
+          url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          {
+            echo "自動維護今次嘅改動冇通過檢查,$( [ "$pushed" = 1 ] && echo '已經自動撤回,系統維持改動之前嘅樣' || echo '撤回失敗,要人手處理')。"
+            echo; echo "改動檢查:"; echo '```'; cat guard.txt; echo '```'
+            echo; echo "測試結果(最後 20 行):"; echo '```'; tail -20 tests.txt; echo '```'
+            echo; echo "執行紀錄:$url"
+          } > body.md
+          gh label create maintenance --color 0e8a16 --description "weekly automatic maintenance" --force >/dev/null 2>&1 || true
+          gh issue create --title "自動維護改動已撤回($(TZ=Asia/Hong_Kong date '+%Y-%m-%d'))" --label maintenance --body-file body.md
+          exit 1
+
+      - name: Post the weekly report
+        if: steps.verify.outputs.skip != 'true' && steps.verify.outputs.guard == '0' && steps.verify.outputs.tests == '0'
+        run: |
+          if git diff --quiet "${{ steps.verify.outputs.base }}" "${{ github.sha }}" -- data/maintenance_log.json; then
+            echo "no new report in this push"; exit 0
+          fi
+          python - <<'PY'
+          import json
+          e = json.load(open("data/maintenance_log.json", encoding="utf-8"))["entries"][-1]
+          label = {"ok": "一切正常", "changed": "有改動", "attention": "要你睇"}[e["status"]]
+          open("status.txt", "w").write(e["status"])
+          open("title.txt", "w", encoding="utf-8").write(f"每週系統維護報告 {e['at'][:10]}({label})")
+          open("body.md", "w", encoding="utf-8").write(
+              f"{e['text']}\n\n---\n改動 {e['changes']} 項 · 要你決定嘅建議 {e['proposals']} 項 · "
+              "每個改動都已經喺 GitHub 重新檢查過同跑過測試。全部紀錄喺網頁底部「系統自動維護」。")
+          PY
+          if [ "$(cat status.txt)" = "ok" ]; then echo "nothing changed or to decide: no issue"; exit 0; fi
+          gh label create maintenance --color 0e8a16 --description "weekly automatic maintenance" --force >/dev/null 2>&1 || true
+          for n in $(gh issue list --label maintenance --state open --json number,title --jq '.[] | select(.title | startswith("每週系統維護報告")) | .number'); do
+            gh issue close "$n" --comment "已有新一週報告。"
+          done
+          gh issue create --title "$(cat title.txt)" --label maintenance --body-file body.md
