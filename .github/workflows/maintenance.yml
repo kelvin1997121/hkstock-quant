@@ -58,7 +58,7 @@ jobs:
           set +e
           python -m hkstock.maintenance guard --base "$base" --head "$head" > guard.txt 2>&1; g=$?
           python -m pytest -q > tests.txt 2>&1; t=$?
-          cat guard.txt; tail -5 tests.txt
+          cat guard.txt; grep -E "^(FAILED|ERROR)|[0-9]+ (passed|failed)" tests.txt | tail -5
           echo "guard=$g" >> "$GITHUB_OUTPUT"; echo "tests=$t" >> "$GITHUB_OUTPUT"
 
       - name: Revert rejected maintenance commits
@@ -76,7 +76,7 @@ jobs:
           {
             echo "自動維護今次嘅改動冇通過檢查,$( [ "$pushed" = 1 ] && echo '已經自動撤回,系統維持改動之前嘅樣' || echo '撤回失敗,要人手處理')。"
             echo; echo "改動檢查:"; echo '```'; cat guard.txt; echo '```'
-            echo; echo "測試結果(最後 20 行):"; echo '```'; tail -20 tests.txt; echo '```'
+            echo; echo "測試結果:"; echo '```'; grep -E "^(FAILED|ERROR)|[0-9]+ (passed|failed)|error" tests.txt | tail -20; echo '```'
             echo; echo "執行紀錄:$url"
           } > body.md
           gh label create maintenance --color 0e8a16 --description "weekly automatic maintenance" --force >/dev/null 2>&1 || true
