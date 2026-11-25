@@ -336,19 +336,19 @@
   ]
  },
  "2026-11-25": {
-  "regime_score": -68,
+  "regime_score": -69,
   "label": "弱勢",
   "short": [
    "PDD",
    "HD",
-   "COST",
-   "TME",
    "MCD",
+   "TME",
+   "COST",
    "WMT",
-   "SBUX",
-   "ABBV",
    "MA",
-   "AAPL"
+   "ABBV",
+   "SBUX",
+   "V"
   ],
   "long": [
    "CVX",
