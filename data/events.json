@@ -322,10 +322,10 @@
 "v": 2
 },
 "2015.HK": {
-"earnings": "2026-11-25",
-"earnings_est": false,
+"earnings": "2027-03-11",
+"earnings_est": true,
 "ex_div": null,
-"fetched": "2026-11-24",
+"fetched": "2026-11-26",
 "v": 2
 },
 "2020.HK": {
