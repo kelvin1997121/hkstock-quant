@@ -362,5 +362,33 @@
    "JNJ",
    "SBUX"
   ]
+ },
+ "2026-11-27": {
+  "regime_score": -45,
+  "label": "弱勢",
+  "short": [
+   "TME",
+   "HD",
+   "PDD",
+   "WMT",
+   "COST",
+   "JD",
+   "AAPL",
+   "SBUX",
+   "MCD",
+   "MA"
+  ],
+  "long": [
+   "CVX",
+   "MO",
+   "ABBV",
+   "COP",
+   "AAPL",
+   "XOM",
+   "V",
+   "JNJ",
+   "PFE",
+   "MRK"
+  ]
  }
 }
